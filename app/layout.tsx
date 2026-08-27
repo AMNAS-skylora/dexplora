@@ -77,7 +77,7 @@ export default function RootLayout({
     "logo": absoluteUrl("/images/logo/logoblack.png"),
     "description": "Premier travel agency organizing curated budget group trips and customized holiday packages across India.",
     "telephone": "+917034267985",
-    "email": "info@dexplora.in",
+    "email": "dexploraindia@gmail.com",
     "address": {
       "@type": "PostalAddress",
       "streetAddress": "MG Road",
@@ -87,8 +87,7 @@ export default function RootLayout({
       "addressCountry": "IN"
     },
     "sameAs": [
-      "https://instagram.com/dexploratours",
-      "https://facebook.com/dexploratours",
+      "https://www.instagram.com/dexplora_tourplanners?igsi=czh3MGY5YnpxaDJ3&utm_source=qr",
       "https://youtube.com/@dexploratours"
     ]
   };

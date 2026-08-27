@@ -48,7 +48,7 @@ export default async function AdminSettingsPage() {
                 name="phone_1"
                 defaultValue={settings.phone_1}
                 required
-                placeholder="+91 7034 267 985"
+                placeholder="+91 70342 67985"
                 className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#3478F6]"
               />
             </div>
@@ -59,7 +59,7 @@ export default async function AdminSettingsPage() {
                 type="text"
                 name="phone_2"
                 defaultValue={settings.phone_2}
-                placeholder="+91 7034 267 986"
+                placeholder="+91 70342 67986"
                 className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#3478F6]"
               />
             </div>
@@ -85,7 +85,7 @@ export default async function AdminSettingsPage() {
                 name="email"
                 defaultValue={settings.email}
                 required
-                placeholder="info@dexplora.in"
+                placeholder="dexploraindia@gmail.com"
                 className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium"
               />
             </div>
