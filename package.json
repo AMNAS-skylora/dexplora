@@ -13,6 +13,12 @@
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
   },
+  "trustedDependencies": [
+    "@prisma/client",
+    "@prisma/engines",
+    "prisma",
+    "unrs-resolver"
+  ],
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
     "@prisma/client": "^5.22.0",
