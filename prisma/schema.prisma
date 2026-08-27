@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("ADMIN") // SUPER_ADMIN, ADMIN, EDITOR
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Destination {
+  id               String         @id @default(uuid())
+  name             String
+  slug             String         @unique
+  state            String
+  country          String         @default("India")
+  shortDescription String?
+  coverImage       String?
+  featured         Boolean        @default(false)
+  active           Boolean        @default(true)
+  displayOrder     Int            @default(0)
+  packages         Package[]
+  galleryImages    GalleryImage[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model Package {
+  id                String             @id @default(uuid())
+  title             String
+  slug              String             @unique
+  shortDescription  String
+  fullDescription   String
+  destinationId     String
+  destination       Destination        @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  tripType          String             @default("Group Trip")
+  coverImage        String
+  duration          String             @default("3 Days / 2 Nights")
+  price             Float
+  originalPrice     Float?
+  departureLocation String             @default("Kerala")
+  arrivalLocation   String
+  accommodation     String             @default("3-Star Hotel / Resort")
+  transportation    String             @default("Train & Private AC Bus")
+  guideInfo         String             @default("Malayali Tour Leader")
+  meals             String             @default("Breakfast & Dinner")
+  featured          Boolean            @default(false)
+  popular           Boolean            @default(false)
+  status            String             @default("PUBLISHED") // DRAFT, PUBLISHED, HIDDEN, SOLD_OUT, ARCHIVED
+  displayOrder      Int                @default(0)
+  seoTitle          String?
+  seoDescription    String?
+  images            PackageImage[]
+  itineraries       PackageItinerary[]
+  inclusions        PackageInclusion[]
+  exclusions        PackageExclusion[]
+  faqs              PackageFAQ[]
+  batches           TripBatch[]
+  bookingEnquiries  BookingEnquiry[]
+  calendarEvents    CalendarEvent[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model PackageImage {
+
+  id           String   @id @default(uuid())
+  packageId    String
+  package      Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  url          String
+  alt          String?
+  caption      String?
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model PackageItinerary {
+  id            String   @id @default(uuid())
+  packageId     String
+  package      Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  dayNumber     Int
+  title         String
+  description   String
+  image         String?
+  meals         String?
+  accommodation String?
+  displayOrder  Int      @default(0)
+  createdAt     DateTime @default(now())
+}
+
+model PackageInclusion {
+  id           String   @id @default(uuid())
+  packageId    String
+  package      Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  text         String
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model PackageExclusion {
+  id           String   @id @default(uuid())
+  packageId    String
+  package      Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  text         String
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model PackageFAQ {
+  id           String   @id @default(uuid())
+  packageId    String
+  package      Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  question     String
+  answer       String
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model TripBatch {
+  id               String           @id @default(uuid())
+  packageId        String
+  package          Package          @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  batchName        String?
+  startDate        DateTime
+  endDate          DateTime
+  priceOverride    Float?
+  totalSeats       Int              @default(30)
+  bookedSeats      Int              @default(0)
+  availableSeats   Int              @default(30)
+  status           String           @default("OPEN") // UPCOMING, OPEN, FILLING_FAST, ALMOST_FULL, SOLD_OUT, COMPLETED, CANCELLED
+  boardingPoint    String?
+  notes            String?
+  bookingEnquiries BookingEnquiry[]
+  calendarEvents   CalendarEvent[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model CalendarEvent {
+  id           String     @id @default(uuid())
+  title        String
+  slug         String     @unique
+  eventType    String     @default("SPECIAL_EVENT") // TRIP, SPECIAL_EVENT, HOLIDAY, ANNIVERSARY, OFFER, CLOSED_DAY
+  startDate    DateTime
+  endDate      DateTime
+  description  String?
+  color        String?
+  status       String     @default("OPEN") // OPEN, FILLING_FAST, ALMOST_FULL, SOLD_OUT, COMPLETED, CANCELLED, CLOSED
+  packageId    String?
+  package      Package?   @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  tripBatchId  String?
+  tripBatch    TripBatch? @relation(fields: [tripBatchId], references: [id], onDelete: SetNull)
+  isActive     Boolean    @default(true)
+  displayOrder Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model GalleryAlbum {
+
+  id           String         @id @default(uuid())
+  name         String
+  slug         String         @unique
+  description  String?
+  coverImage   String?
+  displayOrder Int            @default(0)
+  images       GalleryImage[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model GalleryImage {
+  id            String        @id @default(uuid())
+  albumId       String?
+  album         GalleryAlbum? @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  destinationId String?
+  destination   Destination?  @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+  title         String?
+  caption       String?
+  url           String
+  category      String        @default("Tours")
+  displayOrder  Int           @default(0)
+  featured      Boolean       @default(false)
+  published     Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Testimonial {
+  id            String   @id @default(uuid())
+  customerName  String
+  customerEmail String?
+  customerPhone String?
+  tripName      String
+  rating        Int      @default(5)
+  review        String
+  customerPhoto String?
+  travelDate    String?
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED, HIDDEN
+  featured      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BookingEnquiry {
+  id                 String     @id @default(uuid())
+  referenceCode      String     @unique
+  fullName           String
+  phone              String
+  whatsappNumber     String?
+  email              String?
+  packageId          String
+  package            Package    @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  batchId            String?
+  batch              TripBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  numberOfTravellers Int        @default(1)
+  adults             Int        @default(1)
+  children           Int        @default(0)
+  preferredDate      String?
+  boardingLocation   String?
+  message            String?
+  status             String     @default("NEW") // NEW, READ, CONTACTED, CONFIRMED, CANCELLED
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+model ContactEnquiry {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String
+  email     String?
+  subject   String?
+  message   String
+  status    String   @default("NEW") // NEW, READ, REPLIED, RESOLVED, SPAM
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HeroSlide {
+  id               String   @id @default(uuid())
+  title            String
+  subtitle         String?
+  badge            String?
+  destination      String?
+  startingPrice    Float?
+  desktopImage     String
+  mobileImage      String?
+  primaryBtnText   String   @default("Explore Package")
+  primaryBtnUrl    String   @default("/packages")
+  secondaryBtnText String?  @default("WhatsApp Us")
+  secondaryBtnUrl  String?
+  displayOrder     Int      @default(0)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model SiteSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  group     String   @default("general")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AboutContent {
+  id         String   @id @default(uuid())
+  title      String   @default("About Dexplora Tour Planners")
+  subtitle   String   @default("Crafting unforgettable travel memories with Malayali hospitality")
+  story      String
+  mission    String
+  vision     String
+  philosophy String
+  statsJson  String   @default("[]")
+  teamJson   String   @default("[]")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
