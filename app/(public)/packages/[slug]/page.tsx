@@ -37,15 +37,21 @@ interface PackageDetailPageProps {
 
 export async function generateMetadata({ params }: PackageDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const pkg = await db.package.findUnique({
-    where: { slug },
-    select: {
-      title: true,
-      shortDescription: true,
-      coverImage: true,
-      destination: { select: { name: true } },
-    },
-  });
+  let pkg: any = null;
+
+  try {
+    pkg = await db.package.findUnique({
+      where: { slug },
+      select: {
+        title: true,
+        shortDescription: true,
+        coverImage: true,
+        destination: { select: { name: true } },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching package metadata:", error);
+  }
 
   if (!pkg) {
     return {
@@ -58,11 +64,11 @@ export async function generateMetadata({ params }: PackageDetailPageProps): Prom
   const title = `${pkg.title} | Dexplora Tour Planners`;
   const description =
     pkg.shortDescription ||
-    `Book ${pkg.title} with Dexplora Tour Planners. Includes stays, Malayali tour leaders, and sightseeing in ${pkg.destination.name}.`;
+    `Book ${pkg.title} with Dexplora Tour Planners. Includes stays, Malayali tour leaders, and sightseeing in ${pkg.destination?.name || "India"}.`;
 
-  const imageUrl = pkg.coverImage.startsWith("http")
+  const imageUrl = pkg.coverImage?.startsWith("http")
     ? pkg.coverImage
-    : absoluteUrl(pkg.coverImage);
+    : absoluteUrl(pkg.coverImage || "/images/logo/logoblack.png");
 
   return {
     title: pkg.title,
@@ -95,21 +101,26 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
   const { slug } = await params;
   const settings = await getSiteSettings();
 
-  const pkg = await db.package.findUnique({
-    where: { slug },
-    include: {
-      destination: true,
-      images: { orderBy: { displayOrder: "asc" } },
-      itineraries: { orderBy: { dayNumber: "asc" } },
-      inclusions: { orderBy: { displayOrder: "asc" } },
-      exclusions: { orderBy: { displayOrder: "asc" } },
-      faqs: { orderBy: { displayOrder: "asc" } },
-      batches: {
-        where: { startDate: { gte: new Date() } },
-        orderBy: { startDate: "asc" },
+  let pkg: any = null;
+  try {
+    pkg = await db.package.findUnique({
+      where: { slug },
+      include: {
+        destination: true,
+        images: { orderBy: { displayOrder: "asc" } },
+        itineraries: { orderBy: { dayNumber: "asc" } },
+        inclusions: { orderBy: { displayOrder: "asc" } },
+        exclusions: { orderBy: { displayOrder: "asc" } },
+        faqs: { orderBy: { displayOrder: "asc" } },
+        batches: {
+          where: { startDate: { gte: new Date() } },
+          orderBy: { startDate: "asc" },
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    console.error("Error fetching package detail:", error);
+  }
 
   if (!pkg || pkg.status === "DRAFT" || pkg.status === "HIDDEN") {
     notFound();

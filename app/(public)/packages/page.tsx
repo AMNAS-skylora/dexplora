@@ -64,23 +64,34 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
   if (sort === "popular") orderByQuery = { popular: "desc" };
   if (sort === "latest") orderByQuery = { createdAt: "desc" };
 
-  const packages = await db.package.findMany({
-    where: whereQuery,
-    include: {
-      destination: true,
-      batches: {
-        where: { startDate: { gte: new Date() } },
-        orderBy: { startDate: "asc" },
-        take: 1,
-      },
-    },
-    orderBy: orderByQuery,
-  });
+  let packages: any[] = [];
+  let destinations: any[] = [];
 
-  const destinations = await db.destination.findMany({
-    where: { active: true },
-    orderBy: { name: "asc" },
-  });
+  try {
+    packages = await db.package.findMany({
+      where: whereQuery,
+      include: {
+        destination: true,
+        batches: {
+          where: { startDate: { gte: new Date() } },
+          orderBy: { startDate: "asc" },
+          take: 1,
+        },
+      },
+      orderBy: orderByQuery,
+    });
+  } catch (error) {
+    console.error("Error fetching packages:", error);
+  }
+
+  try {
+    destinations = await db.destination.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+    });
+  } catch (error) {
+    console.error("Error fetching destinations:", error);
+  }
 
   return (
     <div className="w-full min-w-0 max-w-7xl mx-auto px-[clamp(14px,4vw,24px)] py-4 sm:py-8 lg:py-10 space-y-5 sm:space-y-8">

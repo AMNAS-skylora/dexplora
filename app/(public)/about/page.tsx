@@ -33,7 +33,12 @@ interface TeamMember {
 
 export default async function AboutPage() {
   const settings = await getSiteSettings();
-  const about = await db.aboutContent.findFirst();
+  let about: any = null;
+  try {
+    about = await db.aboutContent.findFirst();
+  } catch (error) {
+    console.error("Error fetching aboutContent:", error);
+  }
 
   const stats: StatItem[] = about?.statsJson ? JSON.parse(about.statsJson) : [];
   const team: TeamMember[] = about?.teamJson ? JSON.parse(about.teamJson) : [];

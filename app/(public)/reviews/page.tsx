@@ -17,15 +17,26 @@ export const metadata: Metadata = {
 };
 
 export default async function ReviewsPage() {
-  const testimonials = await db.testimonial.findMany({
-    where: { status: "APPROVED" },
-    orderBy: { createdAt: "desc" },
-  });
+  let testimonials: any[] = [];
+  let packages: any[] = [];
 
-  const packages = await db.package.findMany({
-    where: { status: "PUBLISHED" },
-    select: { id: true, title: true },
-  });
+  try {
+    testimonials = await db.testimonial.findMany({
+      where: { status: "APPROVED" },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    console.error("Error fetching testimonials:", error);
+  }
+
+  try {
+    packages = await db.package.findMany({
+      where: { status: "PUBLISHED" },
+      select: { id: true, title: true },
+    });
+  } catch (error) {
+    console.error("Error fetching packages for reviews:", error);
+  }
 
   // Calculate real rating statistics
   const totalReviews = testimonials.length;

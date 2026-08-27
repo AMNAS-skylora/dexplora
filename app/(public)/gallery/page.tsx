@@ -16,13 +16,18 @@ export const metadata: Metadata = {
 };
 
 export default async function GalleryPage() {
-  const images = await db.galleryImage.findMany({
-    where: { published: true },
-    include: {
-      destination: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  let images: any[] = [];
+  try {
+    images = await db.galleryImage.findMany({
+      where: { published: true },
+      include: {
+        destination: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error) {
+    console.error("Error fetching gallery images:", error);
+  }
 
   return (
     <div className="w-full min-w-0 max-w-7xl mx-auto px-3 min-[390px]:px-3.5 sm:px-6 lg:px-8 py-4 sm:py-8 lg:py-10 space-y-6 sm:space-y-8">

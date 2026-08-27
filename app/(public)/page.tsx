@@ -41,72 +41,102 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   const settings = await getSiteSettings();
 
-  // Fetch Hero Slides
-  const heroSlides = await db.heroSlide.findMany({
-    where: { active: true },
-    orderBy: { displayOrder: "asc" },
-  });
+  // Safely fetch home page data with try-catch fallbacks
+  let heroSlides: any[] = [];
+  let featuredPackages: any[] = [];
+  let upcomingBatches: any[] = [];
+  let customEvents: any[] = [];
+  let destinations: any[] = [];
+  let galleryPreview: any[] = [];
+  let testimonials: any[] = [];
 
-  // Fetch Featured Packages
-  const featuredPackages = await db.package.findMany({
-    where: { status: "PUBLISHED", featured: true },
-    include: {
-      destination: true,
-      batches: {
-        where: { startDate: { gte: new Date() } },
-        orderBy: { startDate: "asc" },
-        take: 1,
+  try {
+    heroSlides = await db.heroSlide.findMany({
+      where: { active: true },
+      orderBy: { displayOrder: "asc" },
+    });
+  } catch (error) {
+    console.error("Error fetching heroSlides:", error);
+  }
+
+  try {
+    featuredPackages = await db.package.findMany({
+      where: { status: "PUBLISHED", featured: true },
+      include: {
+        destination: true,
+        batches: {
+          where: { startDate: { gte: new Date() } },
+          orderBy: { startDate: "asc" },
+          take: 1,
+        },
       },
-    },
-    orderBy: { displayOrder: "asc" },
-    take: 6,
-  });
+      orderBy: { displayOrder: "asc" },
+      take: 6,
+    });
+  } catch (error) {
+    console.error("Error fetching featuredPackages:", error);
+  }
 
-  // Fetch Upcoming Departure Batches
-  const upcomingBatches = await db.tripBatch.findMany({
-    where: {
-      startDate: { gte: new Date() },
-      package: { status: "PUBLISHED" },
-    },
-    include: {
-      package: {
-        include: { destination: true },
+  try {
+    upcomingBatches = await db.tripBatch.findMany({
+      where: {
+        startDate: { gte: new Date() },
+        package: { status: "PUBLISHED" },
       },
-    },
-    orderBy: { startDate: "asc" },
-  });
-
-  // Fetch Custom Calendar Events
-  const customEvents = await db.calendarEvent.findMany({
-    where: { isActive: true },
-    include: {
-      package: {
-        include: { destination: true },
+      include: {
+        package: {
+          include: { destination: true },
+        },
       },
-    },
-    orderBy: { startDate: "asc" },
-  });
+      orderBy: { startDate: "asc" },
+    });
+  } catch (error) {
+    console.error("Error fetching upcomingBatches:", error);
+  }
 
-  // Fetch Popular Destinations
-  const destinations = await db.destination.findMany({
-    where: { active: true },
-    orderBy: { displayOrder: "asc" },
-    take: 6,
-  });
+  try {
+    customEvents = await db.calendarEvent.findMany({
+      where: { isActive: true },
+      include: {
+        package: {
+          include: { destination: true },
+        },
+      },
+      orderBy: { startDate: "asc" },
+    });
+  } catch (error) {
+    console.error("Error fetching customEvents:", error);
+  }
 
-  // Fetch Gallery Preview
-  const galleryPreview = await db.galleryImage.findMany({
-    where: { published: true },
-    orderBy: { createdAt: "desc" },
-    take: 4,
-  });
+  try {
+    destinations = await db.destination.findMany({
+      where: { active: true },
+      orderBy: { displayOrder: "asc" },
+      take: 6,
+    });
+  } catch (error) {
+    console.error("Error fetching destinations:", error);
+  }
 
-  // Fetch Approved Testimonials
-  const testimonials = await db.testimonial.findMany({
-    where: { status: "APPROVED" },
-    orderBy: { createdAt: "desc" },
-    take: 6,
-  });
+  try {
+    galleryPreview = await db.galleryImage.findMany({
+      where: { published: true },
+      orderBy: { createdAt: "desc" },
+      take: 4,
+    });
+  } catch (error) {
+    console.error("Error fetching galleryPreview:", error);
+  }
+
+  try {
+    testimonials = await db.testimonial.findMany({
+      where: { status: "APPROVED" },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+    });
+  } catch (error) {
+    console.error("Error fetching testimonials:", error);
+  }
 
   const highlights = [
     {
