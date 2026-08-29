@@ -1,5 +1,7 @@
 import { MongoClient, ObjectId } from "mongodb";
 
+const options = {};
+
 let client: MongoClient | null = null;
 let clientPromise: Promise<MongoClient> | null = null;
 
@@ -8,34 +10,68 @@ declare global {
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
-function getDb() {
-  const uri = process.env.MONGODB_URI;
+export function getClientPromise(): Promise<MongoClient> {
+  const rawUri = process.env.MONGODB_URI;
+  const uri = rawUri?.trim();
 
   if (!uri) {
     throw new Error(
-      "MONGODB_URI is not configured. Add it to the deployment environment variables."
+      "MONGODB_URI is missing. Add a valid MongoDB connection string to the environment variables."
     );
   }
 
   if (!uri.startsWith("mongodb://") && !uri.startsWith("mongodb+srv://")) {
     throw new Error(
-      "Invalid MONGODB_URI. It must start with mongodb:// or mongodb+srv://"
+      "Invalid MONGODB_URI. Connection string must start with mongodb:// or mongodb+srv://"
     );
   }
 
   if (process.env.NODE_ENV === "development") {
+    if (!global._mongoClientPromise) {
+      client = new MongoClient(uri, options);
+      global._mongoClientPromise = client.connect();
+    }
+    return global._mongoClientPromise;
+  } else {
+    if (!clientPromise) {
+      client = new MongoClient(uri, options);
+      clientPromise = client.connect();
+    }
+    return clientPromise;
+  }
+}
+
+export function getDb() {
+  const rawUri = process.env.MONGODB_URI;
+  const uri = rawUri?.trim();
+
+  if (!uri) {
+    throw new Error(
+      "MONGODB_URI is missing. Add a valid MongoDB connection string to the environment variables."
+    );
+  }
+
+  if (!uri.startsWith("mongodb://") && !uri.startsWith("mongodb+srv://")) {
+    throw new Error(
+      "Invalid MONGODB_URI. Connection string must start with mongodb:// or mongodb+srv://"
+    );
+  }
+
+  const dbName = process.env.MONGODB_DB || undefined;
+
+  if (process.env.NODE_ENV === "development") {
     if (!global._mongoClient) {
-      global._mongoClient = new MongoClient(uri);
+      global._mongoClient = new MongoClient(uri, options);
       global._mongoClientPromise = global._mongoClient.connect();
     }
-    return global._mongoClient.db();
+    return global._mongoClient.db(dbName);
   }
 
   if (!client) {
-    client = new MongoClient(uri);
+    client = new MongoClient(uri, options);
     clientPromise = client.connect();
   }
-  return client.db();
+  return client.db(dbName);
 }
 
 function toObjectId(id: string | ObjectId): ObjectId {

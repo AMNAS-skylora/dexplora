@@ -3,6 +3,9 @@ import { db } from "@/lib/db";
 import { getAdminSession } from "@/lib/auth";
 import { cloudinary } from "@/lib/cloudinary";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
