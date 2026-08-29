@@ -51,7 +51,7 @@ Copy `.env.example` to `.env`:
 ```bash
 cp .env.example .env
 ```
-Ensure `MONGODB_URI` / `DATABASE_URL` is set.
+Ensure `MONGODB_URI` is set.
 
 ### 4. Seed Database Starter Content
 Populates Super Admin credentials, initial packages (Kerala to Meghalaya @ ₹14,499, Mahabaleshwar @ ₹5,699, Matheran @ ₹4,299), destinations, hero slides, approved reviews, and site settings:

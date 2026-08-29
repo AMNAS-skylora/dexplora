@@ -9,9 +9,18 @@ declare global {
 }
 
 function getDb() {
-  const uri = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
+  const uri = process.env.MONGODB_URI;
+
   if (!uri) {
-    throw new Error("MongoDB connection URI is missing from environment variables (MONGODB_URI or DATABASE_URL).");
+    throw new Error(
+      "MONGODB_URI is not configured. Add it to the deployment environment variables."
+    );
+  }
+
+  if (!uri.startsWith("mongodb://") && !uri.startsWith("mongodb+srv://")) {
+    throw new Error(
+      "Invalid MONGODB_URI. It must start with mongodb:// or mongodb+srv://"
+    );
   }
 
   if (process.env.NODE_ENV === "development") {
