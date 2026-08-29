@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 
+export const runtime = "nodejs";
 export const revalidate = 60; // Cache for 60 seconds
 
 export async function GET() {
