@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { getSiteSettings } from "@/lib/settings";
 import { HeroSlider } from "@/components/public/HeroSlider";
 import { PackageCard } from "@/components/public/PackageCard";
+import { PackagesSlider } from "@/components/public/PackagesSlider";
 import { DeparturesCalendar } from "@/components/public/DeparturesCalendar";
 import { TestimonialSlider } from "@/components/public/TestimonialSlider";
 import { DestinationSlider } from "@/components/public/DestinationSlider";
@@ -27,7 +28,7 @@ import {
 import type { Metadata } from "next";
 import { absoluteUrl } from "@/lib/seo";
 
-export const revalidate = 60; // Revalidate every 60 seconds
+export const revalidate = 0; // Fresh database-driven event sync
 
 export const metadata: Metadata = {
   title: "Budget Group Trips Across India",
@@ -52,16 +53,25 @@ export default async function HomePage() {
 
   try {
     heroSlides = await db.heroSlide.findMany({
-      where: { active: true },
-      orderBy: { displayOrder: "asc" },
+      where: {
+        OR: [
+          { isActive: true },
+          { active: true },
+        ],
+      },
+      orderBy: [
+        { sortOrder: "asc" },
+        { displayOrder: "asc" },
+      ],
     });
   } catch (error) {
     console.error("Error fetching heroSlides:", error);
   }
 
+  let allPackages: any[] = [];
   try {
-    featuredPackages = await db.package.findMany({
-      where: { status: "PUBLISHED", featured: true },
+    allPackages = await db.package.findMany({
+      where: { status: "PUBLISHED" },
       include: {
         destination: true,
         batches: {
@@ -71,17 +81,18 @@ export default async function HomePage() {
         },
       },
       orderBy: { displayOrder: "asc" },
-      take: 6,
     });
   } catch (error) {
-    console.error("Error fetching featuredPackages:", error);
+    console.error("Error fetching allPackages:", error);
   }
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   try {
-    upcomingBatches = await db.tripBatch.findMany({
+    const rawBatches = await db.tripBatch.findMany({
       where: {
-        startDate: { gte: new Date() },
-        package: { status: "PUBLISHED" },
+        startDate: { gte: today },
       },
       include: {
         package: {
@@ -90,6 +101,13 @@ export default async function HomePage() {
       },
       orderBy: { startDate: "asc" },
     });
+
+    upcomingBatches = (rawBatches || []).filter(
+      (b: any) =>
+        b.status !== "CANCELLED" &&
+        b.status !== "COMPLETED" &&
+        (!b.package || b.package.status === "PUBLISHED" || b.package.status === undefined)
+    );
   } catch (error) {
     console.error("Error fetching upcomingBatches:", error);
   }
@@ -237,39 +255,37 @@ export default async function HomePage() {
         </Reveal>
       </section>
 
-      {/* 3. Featured Packages */}
-      <section className="w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-        <Reveal direction="up" duration={600}>
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-[#3478F6]">Handpicked Adventures</span>
-              <h2 className="text-2xl sm:text-4xl font-extrabold text-[#0B1026] mt-1">
-                Featured Tour Packages
-              </h2>
+      {/* 3. Tour Packages Horizontal Drag/Swipe Slider */}
+      <section className="w-full py-10 lg:py-18 overflow-hidden">
+        <div className="w-full max-w-[1200px] mx-auto px-[clamp(16px,4vw,24px)]">
+          <Reveal direction="up" duration={600}>
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 sm:mb-10 gap-4">
+              <div>
+                <span className="text-[13px] font-semibold tracking-[0.04em] text-[#3478F6] uppercase block">
+                  Handpicked Adventures
+                </span>
+                <h2 className="text-[clamp(28px,5vw,44px)] leading-[1.05] font-extrabold text-[#0B1026] mt-1 tracking-tight">
+                  Tour Packages
+                </h2>
+              </div>
+              <Link
+                href="/packages"
+                className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-[#3478F6] hover:text-[#2563EB] transition-colors shrink-0"
+              >
+                <span>View All Packages</span>
+                <ArrowRight className="w-4 h-4 stroke-[2.2]" />
+              </Link>
             </div>
-            <Link
-              href="/packages"
-              className="inline-flex items-center gap-2 text-sm font-bold text-[#3478F6] hover:text-[#2563EB] transition-colors"
-            >
-              <span>View All Packages</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </Reveal>
+          </Reveal>
 
-        {featuredPackages.length > 0 ? (
-          <StaggerContainer className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-6 overflow-x-auto snap-x snap-mandatory pb-4 sm:pb-0 scrollbar-none">
-            {featuredPackages.map((pkg: any, idx: number) => (
-              <StaggerItem key={pkg.id} index={idx} className="w-[88%] sm:w-auto shrink-0 snap-align-start">
-                <PackageCard {...pkg} featured={pkg.featured} />
-              </StaggerItem>
-            ))}
-          </StaggerContainer>
-        ) : (
-          <div className="bg-[#F3F7FF] rounded-2xl p-12 text-center text-[#667085]">
-            <p>No featured packages at the moment. New adventures coming soon!</p>
-          </div>
-        )}
+          {allPackages.length > 0 ? (
+            <PackagesSlider packages={allPackages} />
+          ) : (
+            <div className="bg-[#F3F7FF] rounded-2xl p-12 text-center text-[#667085]">
+              <p>No tour packages available at the moment. New adventures coming soon!</p>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* 4. Dynamic Upcoming Departures Travel Calendar */}
@@ -295,16 +311,24 @@ export default async function HomePage() {
 
 
       {/* 5. Popular Destinations */}
-      <section className="w-full overflow-hidden py-4">
-        <div className="w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
+      <section className="w-full overflow-hidden py-10 sm:py-16 md:py-20 bg-gradient-to-b from-[#F3F7FF]/90 via-white to-[#F8FAFC] border-y border-[#E8ECF3]/60 relative">
+        {/* Subtle Ambient Travel Backdrop Accents */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full pointer-events-none overflow-hidden">
+          <div className="absolute -top-24 left-1/4 w-96 h-96 bg-[#3478F6]/5 rounded-full blur-3xl" />
+          <div className="absolute -bottom-24 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
           <Reveal direction="up" duration={600}>
-            <div className="text-center max-w-2xl mx-auto mb-6 space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#3478F6]">Explore India</span>
-              <h2 className="text-2xl sm:text-4xl font-extrabold text-[#0B1026]">
+            <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-10 space-y-2">
+              <span className="text-xs font-extrabold uppercase tracking-widest text-[#3478F6] bg-[#3478F6]/10 border border-[#3478F6]/20 px-3.5 py-1 rounded-full inline-block">
+                Explore India
+              </span>
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-[#0B1026] tracking-tight">
                 Popular Destinations
               </h2>
-              <p className="text-sm text-[#667085]">
-                Discover breathtaking mountain ranges, valleys, and coastal escapes.
+              <p className="text-xs sm:text-sm md:text-base text-[#667085] font-medium max-w-lg mx-auto">
+                Discover breathtaking mountain ranges, lush valleys, and coastal escapes curated for your next journey.
               </p>
             </div>
           </Reveal>

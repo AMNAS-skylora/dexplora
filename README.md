@@ -1,6 +1,6 @@
 # Dexplora Tour Planners — Full Production Website & Admin Panel
 
-A production-ready, mobile-first travel and adventure tour management web application for **Dexplora Tour Planners** built with **Next.js 16+ App Router**, **TypeScript**, **Tailwind CSS**, **Prisma ORM**, **SQLite / PostgreSQL**, and secure admin authentication.
+A production-ready, mobile-first travel and adventure tour management web application for **Dexplora Tour Planners** built with **Next.js 16+ App Router**, **TypeScript**, **Tailwind CSS**, **MongoDB**, and secure admin authentication.
 
 ---
 
@@ -31,7 +31,7 @@ A production-ready, mobile-first travel and adventure tour management web applic
 - **Framework**: Next.js 16+ (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v4
-- **Database & ORM**: Prisma ORM (SQLite / PostgreSQL)
+- **Database**: MongoDB (Native Node Driver)
 - **Authentication**: Custom JWT Session Cookie (`jose` & `bcryptjs`)
 - **Form & Validation**: React Hook Form, Zod
 - **Icons**: Lucide React
@@ -51,13 +51,7 @@ Copy `.env.example` to `.env`:
 ```bash
 cp .env.example .env
 ```
-Ensure `DATABASE_URL="file:./dev.db"` is set.
-
-### 3. Generate Prisma Client & Run Database Migration
-```bash
-npx prisma generate
-npx prisma db push
-```
+Ensure `MONGODB_URI` / `DATABASE_URL` is set.
 
 ### 4. Seed Database Starter Content
 Populates Super Admin credentials, initial packages (Kerala to Meghalaya @ ₹14,499, Mahabaleshwar @ ₹5,699, Matheran @ ₹4,299), destinations, hero slides, approved reviews, and site settings:

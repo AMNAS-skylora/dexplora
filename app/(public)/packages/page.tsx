@@ -34,7 +34,7 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
   const type = params.type || "";
   const sort = params.sort || "latest";
 
-  // Build Prisma filter query
+  // Build MongoDB filter query
   const whereQuery: any = {
     status: "PUBLISHED",
   };

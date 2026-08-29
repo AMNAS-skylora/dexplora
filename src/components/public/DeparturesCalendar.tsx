@@ -86,7 +86,30 @@ const MONTH_NAMES = [
 
 const WEEKDAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
-export function DeparturesCalendar({ batches, customEvents = [] }: DeparturesCalendarProps) {
+function parseLocalDate(dateInput: Date | string): Date {
+  if (!dateInput) return new Date();
+  if (dateInput instanceof Date) return dateInput;
+
+  const str = String(dateInput);
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const y = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10) - 1;
+    const d = parseInt(match[3], 10);
+    return new Date(y, m, d);
+  }
+  return new Date(dateInput);
+}
+
+function getDateKey(dateValue: Date | string): string {
+  const d = parseLocalDate(dateValue);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function DeparturesCalendar({ batches = [], customEvents = [] }: DeparturesCalendarProps) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [selectedDayEvents, setSelectedDayEvents] = useState<MergedCalendarItem[] | null>(null);
   const [activeCalloutDayNum, setActiveCalloutDayNum] = useState<number | null>(null);
@@ -105,9 +128,9 @@ export function DeparturesCalendar({ batches, customEvents = [] }: DeparturesCal
   const mergedItems = useMemo<MergedCalendarItem[]>(() => {
     const items: MergedCalendarItem[] = [];
 
-    batches.forEach((b) => {
-      const sDate = new Date(b.startDate);
-      const eDate = new Date(b.endDate);
+    (batches || []).forEach((b) => {
+      const sDate = parseLocalDate(b.startDate);
+      const eDate = parseLocalDate(b.endDate);
       const total = b.totalSeats || 30;
       const avail = b.availableSeats !== undefined ? b.availableSeats : 30;
       const ratio = total > 0 ? avail / total : 0;
@@ -122,25 +145,25 @@ export function DeparturesCalendar({ batches, customEvents = [] }: DeparturesCal
 
       items.push({
         id: b.id,
-        title: b.batchName ? `${b.package.title} (${b.batchName})` : b.package.title,
+        title: b.batchName ? `${b.package?.title || "Group Departure"} (${b.batchName})` : (b.package?.title || "Group Departure"),
         startDate: sDate,
         endDate: eDate,
         eventType: "TRIP",
         status: calcStatus,
-        price: b.priceOverride || b.package.price,
+        price: b.priceOverride || b.package?.price,
         totalSeats: total,
         availableSeats: avail,
-        destinationName: b.package.destination.name,
-        duration: b.package.duration,
-        packageSlug: b.package.slug,
+        destinationName: b.package?.destination?.name || "India",
+        duration: b.package?.duration || "Multi-day",
+        packageSlug: b.package?.slug || "trip",
         tripBatchId: b.id,
-        coverImage: b.package.coverImage,
+        coverImage: b.package?.coverImage,
       });
     });
 
-    customEvents.forEach((ev) => {
-      const sDate = new Date(ev.startDate);
-      const eDate = new Date(ev.endDate);
+    (customEvents || []).forEach((ev) => {
+      const sDate = parseLocalDate(ev.startDate);
+      const eDate = parseLocalDate(ev.endDate);
 
       items.push({
         id: ev.id,
@@ -150,7 +173,7 @@ export function DeparturesCalendar({ batches, customEvents = [] }: DeparturesCal
         eventType: ev.eventType || "SPECIAL_EVENT",
         status: ev.status || "OPEN",
         price: ev.package?.price || null,
-        destinationName: ev.package?.destination.name || undefined,
+        destinationName: ev.package?.destination?.name || undefined,
         duration: ev.package?.duration || undefined,
         packageSlug: ev.package?.slug || undefined,
         tripBatchId: ev.tripBatchId || undefined,
@@ -163,19 +186,17 @@ export function DeparturesCalendar({ batches, customEvents = [] }: DeparturesCal
     return items;
   }, [batches, customEvents]);
 
-  // 2. Pre-computed Day Event Map for O(1) Calendar Lookups
-  const dayEventMap = useMemo(() => {
-    const map = new Map<number, MergedCalendarItem[]>();
+  // 2. Pre-computed Day Event Map for O(1) Calendar Lookups via getDateKey
+  const eventsByDateMap = useMemo(() => {
+    const map = new Map<string, MergedCalendarItem[]>();
     mergedItems.forEach((item) => {
-      if (item.startDate.getFullYear() === currentYear && item.startDate.getMonth() === currentMonth) {
-        const dayNum = item.startDate.getDate();
-        const existing = map.get(dayNum) || [];
-        existing.push(item);
-        map.set(dayNum, existing);
-      }
+      const key = getDateKey(item.startDate);
+      const existing = map.get(key) || [];
+      existing.push(item);
+      map.set(key, existing);
     });
     return map;
-  }, [mergedItems, currentYear, currentMonth]);
+  }, [mergedItems]);
 
   const firstDayIndex = useMemo(() => new Date(currentYear, currentMonth, 1).getDay(), [currentYear, currentMonth]);
   const daysInMonth = useMemo(() => new Date(currentYear, currentMonth + 1, 0).getDate(), [currentYear, currentMonth]);
@@ -185,9 +206,13 @@ export function DeparturesCalendar({ batches, customEvents = [] }: DeparturesCal
   const isCurrentMonthView = todayObj.getFullYear() === currentYear && todayObj.getMonth() === currentMonth;
   const todayDateNumber = todayObj.getDate();
 
-  const getEventsForDay = useCallback((dayNum: number) => {
-    return dayEventMap.get(dayNum) || [];
-  }, [dayEventMap]);
+  const getEventsForDay = useCallback(
+    (dayNum: number) => {
+      const key = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+      return eventsByDateMap.get(key) || [];
+    },
+    [eventsByDateMap, currentYear, currentMonth]
+  );
 
   // Auto-find initial featured callout day
   useEffect(() => {

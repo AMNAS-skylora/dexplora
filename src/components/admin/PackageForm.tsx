@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createPackage, updatePackage } from "@/actions";
-import { Plus, Trash2, Save, ArrowLeft, Image as ImageIcon } from "lucide-react";
+import { Plus, Trash2, Save, ArrowLeft, RefreshCw, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { PackageCoverUploader } from "./PackageCoverUploader";
+import { DestinationSearchSelector, DestinationOption } from "./DestinationSearchSelector";
+import { ItineraryDayUploader } from "./ItineraryDayUploader";
 
 export interface PackageInitialData {
   id?: string;
@@ -31,33 +34,86 @@ export interface PackageInitialData {
   seoTitle?: string | null;
   seoDescription?: string | null;
   images?: Array<{ url: string; caption?: string | null }>;
-  itineraries?: Array<{ dayNumber: number; title: string; description: string; meals?: string | null; accommodation?: string | null }>;
+  itineraries?: Array<{ dayNumber: number; title: string; description: string; imageUrl?: string | null; meals?: string | null; accommodation?: string | null }>;
   inclusions?: Array<{ text: string }>;
   exclusions?: Array<{ text: string }>;
   faqs?: Array<{ question: string; answer: string }>;
 }
 
+interface FormErrors {
+  title?: string;
+  destinationId?: string;
+  days?: string;
+  nights?: string;
+  coverImage?: string;
+}
+
 interface PackageFormProps {
-  destinations: Array<{ id: string; name: string }>;
+  destinations: DestinationOption[];
   initialData?: PackageInitialData | null;
+}
+
+// Helper to parse "6 Days / 5 Nights" string into { days, nights }
+function parseDurationString(durationStr?: string | null): { days: number; nights: number } {
+  if (!durationStr) return { days: 6, nights: 5 };
+  const daysMatch = durationStr.match(/(\d+)\s*Days?/i);
+  const nightsMatch = durationStr.match(/(\d+)\s*Nights?/i);
+
+  const days = daysMatch ? parseInt(daysMatch[1], 10) : 6;
+  const nights = nightsMatch ? parseInt(nightsMatch[1], 10) : Math.max(days - 1, 0);
+
+  return { days, nights };
 }
 
 export function PackageForm({ destinations, initialData }: PackageFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
 
-  // Dynamic state arrays
-  const [itineraries, setItineraries] = useState<Array<{ dayNumber: number; title: string; description: string; meals?: string; accommodation?: string }>>(
+  // Basic Form States
+  const [title, setTitle] = useState(initialData?.title || "");
+  const [destinationId, setDestinationId] = useState(initialData?.destinationId || destinations[0]?.id || "");
+
+  // Duration State (Days & Nights)
+  const initialDuration = parseDurationString(initialData?.duration);
+  const [days, setDays] = useState<number>(initialDuration.days);
+  const [nights, setNights] = useState<number>(initialDuration.nights);
+  const [userEditedNights, setUserEditedNights] = useState<boolean>(false);
+
+  // Cover image state
+  const [coverImage, setCoverImage] = useState<string>(initialData?.coverImage || "");
+  const [uploadingCover, setUploadingCover] = useState(false);
+
+  // Auto-calculate nights when days changes if user has not manually edited nights
+  const handleDaysChange = (newDays: number) => {
+    setDays(newDays);
+    if (!userEditedNights) {
+      setNights(Math.max(newDays - 1, 0));
+    }
+    if (fieldErrors.days) {
+      setFieldErrors((prev) => ({ ...prev, days: undefined }));
+    }
+  };
+
+  const handleNightsChange = (newNights: number) => {
+    setUserEditedNights(true);
+    setNights(newNights);
+    if (fieldErrors.nights) {
+      setFieldErrors((prev) => ({ ...prev, nights: undefined }));
+    }
+  };
+
+  // Dynamic Itinerary state with day images
+  const [itineraries, setItineraries] = useState<Array<{ dayNumber: number; title: string; description: string; imageUrl?: string }>>(
     initialData?.itineraries?.length
-      ? initialData.itineraries.map((it) => ({
-          dayNumber: it.dayNumber,
+      ? initialData.itineraries.map((it, idx) => ({
+          dayNumber: idx + 1,
           title: it.title,
           description: it.description,
-          meals: it.meals || "",
-          accommodation: it.accommodation || "",
+          imageUrl: it.imageUrl || "",
         }))
-      : [{ dayNumber: 1, title: "", description: "", meals: "", accommodation: "" }]
+      : [{ dayNumber: 1, title: "", description: "", imageUrl: "" }]
   );
 
   const [inclusions, setInclusions] = useState<string[]>(
@@ -84,29 +140,63 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       : []
   );
 
+  const validate = (): boolean => {
+    const errors: FormErrors = {};
+
+    if (!title.trim()) {
+      errors.title = "Package title is required.";
+    }
+
+    if (!destinationId) {
+      errors.destinationId = "Please select a destination.";
+    }
+
+    if (!days || days < 1) {
+      errors.days = "Days must be at least 1.";
+    }
+
+    if (nights < 0) {
+      errors.nights = "Nights cannot be negative.";
+    }
+
+    if (!coverImage || !coverImage.trim()) {
+      errors.coverImage = "Cover image is required.";
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
 
+    if (!validate()) {
+      return;
+    }
+
+    setLoading(true);
+
     const formData = new FormData(e.currentTarget);
+    const generatedDuration = `${days} Days / ${nights} Nights`;
+
     const data = {
-      title: formData.get("title") as string,
-      slug: formData.get("slug") as string,
+      title: title.trim(),
+      slug: initialData?.slug || undefined, // Server Actions auto-generate unique slug if undefined
       shortDescription: formData.get("shortDescription") as string,
       fullDescription: formData.get("fullDescription") as string,
-      destinationId: formData.get("destinationId") as string,
-      tripType: formData.get("tripType") as string,
-      coverImage: formData.get("coverImage") as string,
-      duration: formData.get("duration") as string,
+      destinationId,
+      tripType: "Group Departure", // Preserved as neutral default for legacy schema compatibility
+      coverImage: coverImage.trim(),
+      duration: generatedDuration,
       price: Number(formData.get("price")),
       originalPrice: formData.get("originalPrice") ? Number(formData.get("originalPrice")) : null,
-      departureLocation: formData.get("departureLocation") as string,
+      departureLocation: (formData.get("departureLocation") as string) || "Kerala",
       arrivalLocation: formData.get("arrivalLocation") as string,
-      accommodation: formData.get("accommodation") as string,
-      transportation: formData.get("transportation") as string,
-      guideInfo: formData.get("guideInfo") as string,
-      meals: formData.get("meals") as string,
+      accommodation: (formData.get("accommodation") as string) || "3-Star Hotel & Resort",
+      transportation: (formData.get("transportation") as string) || "Private Vehicle",
+      guideInfo: (formData.get("guideInfo") as string) || "Tour Leader",
+      meals: (formData.get("meals") as string) || "",
       featured: formData.get("featured") === "on",
       popular: formData.get("popular") === "on",
       status: (formData.get("status") as any) || "PUBLISHED",
@@ -114,7 +204,14 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       seoTitle: (formData.get("seoTitle") as string) || undefined,
       seoDescription: (formData.get("seoDescription") as string) || undefined,
       images: galleryImages.filter((img) => img.url.trim() !== ""),
-      itineraries: itineraries.filter((it) => it.title.trim() !== ""),
+      itineraries: itineraries
+        .filter((it) => it.title.trim() !== "")
+        .map((it, idx) => ({
+          dayNumber: idx + 1,
+          title: it.title,
+          description: it.description,
+          imageUrl: it.imageUrl || null,
+        })),
       inclusions: inclusions.filter((inc) => inc.trim() !== ""),
       exclusions: exclusions.filter((exc) => exc.trim() !== ""),
       faqs: faqs.filter((f) => f.question.trim() !== ""),
@@ -136,14 +233,29 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
     }
   }
 
+  const addItineraryDay = () => {
+    setItineraries((prev) => [
+      ...prev,
+      { dayNumber: prev.length + 1, title: "", description: "", imageUrl: "" },
+    ]);
+  };
+
+  const removeItineraryDay = (index: number) => {
+    setItineraries((prev) =>
+      prev
+        .filter((_, i) => i !== index)
+        .map((it, idx) => ({ ...it, dayNumber: idx + 1 }))
+    );
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto pb-12">
+    <form onSubmit={handleSubmit} noValidate className="space-y-8 max-w-5xl mx-auto pb-12">
+      {/* Header Bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
             href="/admin/packages"
-            className="p-2 rounded-xl bg-white border border-[#E8ECF3] hover:bg-gray-50 text-gray-700"
+            className="p-2 rounded-xl bg-white border border-[#E8ECF3] hover:bg-gray-50 text-gray-700 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
@@ -154,75 +266,62 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
 
         <button
           type="submit"
-          disabled={loading}
-          className="bg-[#3478F6] hover:bg-[#2563EB] text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow-md transition-colors flex items-center gap-2 min-h-[44px]"
+          disabled={loading || uploadingCover}
+          className="bg-[#3478F6] hover:bg-[#2563EB] text-white px-6 py-2.5 rounded-xl font-bold text-xs shadow-md transition-colors flex items-center gap-2 min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
-          <Save className="w-4 h-4" />
-          <span>{loading ? "Saving Package..." : "Save Package"}</span>
+          {uploadingCover ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              <span>Uploading image...</span>
+            </>
+          ) : loading ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              <span>Saving Package...</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              <span>Save Package</span>
+            </>
+          )}
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-[#DC2626] p-4 rounded-xl text-xs font-bold border border-red-200">
-          {error}
+        <div className="bg-red-50 text-[#DC2626] p-4 rounded-xl text-xs font-bold border border-red-200 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
-      {/* Basic Info */}
+      {/* 1. Basic Package Information */}
       <div className="bg-white rounded-3xl p-6 border border-[#E8ECF3] shadow-sm space-y-4">
         <h3 className="font-extrabold text-base text-[#0B1026]">1. Basic Package Information</h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="sm:col-span-2 space-y-1">
             <label className="block text-xs font-bold text-[#0B1026] mb-1">Package Title *</label>
             <input
               type="text"
-              name="title"
-              defaultValue={initialData?.title}
-              required
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (fieldErrors.title) setFieldErrors((prev) => ({ ...prev, title: undefined }));
+              }}
               placeholder="e.g. Kerala to Meghalaya Group Package"
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6]"
+              className={`w-full bg-[#F3F7FF] border rounded-xl px-3.5 py-2.5 text-xs font-bold transition-colors outline-none min-h-[44px] ${
+                fieldErrors.title
+                  ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-500/20"
+                  : "border-[#E8ECF3] text-[#0B1026] focus:border-[#3478F6]"
+              }`}
             />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-[#0B1026] mb-1">URL Slug (Auto or Custom)</label>
-            <input
-              type="text"
-              name="slug"
-              defaultValue={initialData?.slug}
-              placeholder="kerala-to-meghalaya-group-package"
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6]"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-[#0B1026] mb-1">Destination *</label>
-            <select
-              name="destinationId"
-              defaultValue={initialData?.destinationId || destinations[0]?.id}
-              required
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:border-[#3478F6]"
-            >
-              {destinations.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-[#0B1026] mb-1">Trip Type</label>
-            <input
-              type="text"
-              name="tripType"
-              defaultValue={initialData?.tripType || "Group Trip"}
-              placeholder="Group Departure / Weekend Tour"
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6]"
-            />
+            {fieldErrors.title && (
+              <p role="alert" className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{fieldErrors.title}</span>
+              </p>
+            )}
           </div>
 
           <div>
@@ -230,7 +329,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
             <select
               name="status"
               defaultValue={initialData?.status || "PUBLISHED"}
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:border-[#3478F6]"
+              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#0B1026] focus:outline-none focus:border-[#3478F6] min-h-[44px]"
             >
               <option value="PUBLISHED">Published</option>
               <option value="DRAFT">Draft</option>
@@ -241,6 +340,19 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
           </div>
         </div>
 
+        {/* Searchable Destination Selector */}
+        <DestinationSearchSelector
+          destinations={destinations}
+          value={destinationId}
+          onChange={(id) => {
+            setDestinationId(id);
+            if (fieldErrors.destinationId) {
+              setFieldErrors((prev) => ({ ...prev, destinationId: undefined }));
+            }
+          }}
+          error={fieldErrors.destinationId}
+        />
+
         <div>
           <label className="block text-xs font-bold text-[#0B1026] mb-1">Short Description *</label>
           <input
@@ -248,7 +360,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
             name="shortDescription"
             defaultValue={initialData?.shortDescription}
             required
-            placeholder="Brief 1-2 sentence summary for cards..."
+            placeholder="Brief 1-2 sentence summary for package cards..."
             className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6]"
           />
         </div>
@@ -266,11 +378,12 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
         </div>
       </div>
 
-      {/* Pricing & Logistics */}
-      <div className="bg-white rounded-3xl p-6 border border-[#E8ECF3] shadow-sm space-y-4">
+      {/* 2. Pricing & Key Logistics */}
+      <div className="bg-white rounded-3xl p-6 border border-[#E8ECF3] shadow-sm space-y-5">
         <h3 className="font-extrabold text-base text-[#0B1026]">2. Pricing & Key Logistics</h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Row 1: Selling Price, Original Price, Days, Nights */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-bold text-[#0B1026] mb-1">Selling Price (₹) *</label>
             <input
@@ -279,7 +392,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
               defaultValue={initialData?.price}
               required
               placeholder="14499"
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#3478F6] focus:outline-none focus:border-[#3478F6]"
+              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#3478F6] focus:outline-none focus:border-[#3478F6] min-h-[44px]"
             />
           </div>
 
@@ -290,37 +403,72 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
               name="originalPrice"
               defaultValue={initialData?.originalPrice ?? undefined}
               placeholder="17999"
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6]"
+              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6] min-h-[44px]"
             />
-
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-[#0B1026] mb-1">Duration *</label>
+          <div className="space-y-1">
+            <label className="block text-xs font-bold text-[#0B1026] mb-1">Days *</label>
             <input
-              type="text"
-              name="duration"
-              defaultValue={initialData?.duration || "6 Days / 5 Nights"}
-              required
-              placeholder="6 Days / 5 Nights"
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6]"
+              type="number"
+              min="1"
+              value={days}
+              onChange={(e) => handleDaysChange(Number(e.target.value))}
+              placeholder="6"
+              className={`w-full bg-[#F3F7FF] border rounded-xl px-3.5 py-2.5 text-xs font-bold transition-colors outline-none min-h-[44px] ${
+                fieldErrors.days
+                  ? "border-red-500 bg-red-50/50 text-red-900"
+                  : "border-[#E8ECF3] text-[#0B1026] focus:border-[#3478F6]"
+              }`}
             />
+            {fieldErrors.days && (
+              <p role="alert" className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{fieldErrors.days}</span>
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-bold text-[#0B1026] mb-1">Nights *</label>
+            <input
+              type="number"
+              min="0"
+              value={nights}
+              onChange={(e) => handleNightsChange(Number(e.target.value))}
+              placeholder="5"
+              className={`w-full bg-[#F3F7FF] border rounded-xl px-3.5 py-2.5 text-xs font-bold transition-colors outline-none min-h-[44px] ${
+                fieldErrors.nights
+                  ? "border-red-500 bg-red-50/50 text-red-900"
+                  : "border-[#E8ECF3] text-[#0B1026] focus:border-[#3478F6]"
+              }`}
+            />
+            {fieldErrors.nights && (
+              <p role="alert" className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{fieldErrors.nights}</span>
+              </p>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-[#0B1026] mb-1">Cover Image URL *</label>
-            <input
-              type="url"
-              name="coverImage"
-              defaultValue={initialData?.coverImage}
-              required
-              placeholder="https://images.unsplash.com/..."
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6]"
-            />
-          </div>
+        {/* Row 2: Cover Image Uploader (Full Width) */}
+        <div className="pt-2">
+          <PackageCoverUploader
+            value={coverImage}
+            onChange={(url) => {
+              setCoverImage(url);
+              if (fieldErrors.coverImage) {
+                setFieldErrors((prev) => ({ ...prev, coverImage: undefined }));
+              }
+            }}
+            onUploadingChange={setUploadingCover}
+            error={fieldErrors.coverImage}
+          />
+        </div>
 
+        {/* Row 3: Departure Boarding Point & Arrival Destination */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-[#0B1026] mb-1">Departure Boarding Point</label>
             <input
@@ -328,7 +476,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
               name="departureLocation"
               defaultValue={initialData?.departureLocation || "Kerala"}
               placeholder="Kochi / Calicut / Trivandrum"
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6]"
+              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6] min-h-[44px]"
             />
           </div>
 
@@ -340,11 +488,12 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
               defaultValue={initialData?.arrivalLocation}
               required
               placeholder="Guwahati / Shillong"
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6]"
+              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-[#3478F6] min-h-[44px]"
             />
           </div>
         </div>
 
+        {/* Row 4: Accommodation, Transportation, Guide Info */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-bold text-[#0B1026] mb-1">Accommodation</label>
@@ -352,7 +501,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
               type="text"
               name="accommodation"
               defaultValue={initialData?.accommodation || "3-Star Hotel & Resort"}
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium"
+              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium min-h-[44px]"
             />
           </div>
 
@@ -362,7 +511,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
               type="text"
               name="transportation"
               defaultValue={initialData?.transportation || "Train & Private AC Vehicle"}
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium"
+              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium min-h-[44px]"
             />
           </div>
 
@@ -372,7 +521,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
               type="text"
               name="guideInfo"
               defaultValue={initialData?.guideInfo || "Malayali Tour Leader"}
-              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium"
+              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-medium min-h-[44px]"
             />
           </div>
         </div>
@@ -400,64 +549,81 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
         </div>
       </div>
 
-      {/* Dynamic Itinerary Builder */}
+      {/* 3. Dynamic Day-by-Day Itinerary Builder */}
       <div className="bg-white rounded-3xl p-6 border border-[#E8ECF3] shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-extrabold text-base text-[#0B1026]">3. Day-by-Day Itinerary</h3>
           <button
             type="button"
-            onClick={() =>
-              setItineraries([
-                ...itineraries,
-                { dayNumber: itineraries.length + 1, title: "", description: "", meals: "", accommodation: "" },
-              ])
-            }
-            className="bg-[#F3F7FF] hover:bg-[#3478F6] text-[#3478F6] hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+            onClick={addItineraryDay}
+            className="bg-[#F3F7FF] hover:bg-[#3478F6] text-[#3478F6] hover:text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer min-h-[38px]"
           >
             <Plus className="w-4 h-4" />
             <span>Add Day</span>
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           {itineraries.map((it, idx) => (
-            <div key={idx} className="bg-[#F3F7FF] p-4 rounded-2xl border border-[#3478F6]/20 space-y-3">
+            <div key={idx} className="bg-[#F8FAFC] p-4 sm:p-5 rounded-2xl border border-[#E8ECF3] space-y-4">
               <div className="flex items-center justify-between">
-                <span className="font-extrabold text-xs text-[#3478F6]">Day {idx + 1}</span>
+                <span className="font-extrabold text-xs text-[#3478F6] uppercase tracking-wider bg-[#3478F6]/10 px-2.5 py-1 rounded-lg">
+                  Day {it.dayNumber}
+                </span>
                 {itineraries.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => setItineraries(itineraries.filter((_, i) => i !== idx))}
-                    className="text-red-500 hover:text-red-700 text-xs"
+                    onClick={() => removeItineraryDay(idx)}
+                    className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1 cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Remove Day</span>
                   </button>
                 )}
               </div>
 
-              <input
-                type="text"
-                value={it.title}
-                onChange={(e) => {
-                  const updated = [...itineraries];
-                  updated[idx].title = e.target.value;
-                  setItineraries(updated);
-                }}
-                placeholder="Day Title (e.g. Shillong to Cherrapunji Waterfalls)"
-                className="w-full bg-white border border-[#E8ECF3] rounded-xl px-3 py-2 text-xs font-bold text-[#0B1026]"
-              />
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#0B1026] mb-1">Day {it.dayNumber} Title *</label>
+                  <input
+                    type="text"
+                    value={it.title}
+                    onChange={(e) => {
+                      const updated = [...itineraries];
+                      updated[idx].title = e.target.value;
+                      setItineraries(updated);
+                    }}
+                    placeholder="e.g. Shillong to Cherrapunji Waterfalls & Caves"
+                    className="w-full bg-white border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#0B1026] outline-none focus:border-[#3478F6]"
+                  />
+                </div>
 
-              <textarea
-                value={it.description}
-                onChange={(e) => {
-                  const updated = [...itineraries];
-                  updated[idx].description = e.target.value;
-                  setItineraries(updated);
-                }}
-                rows={3}
-                placeholder="Day schedule details..."
-                className="w-full bg-white border border-[#E8ECF3] rounded-xl px-3 py-2 text-xs text-[#0B1026]"
-              />
+                <div>
+                  <label className="block text-[11px] font-bold text-[#0B1026] mb-1">Day Description</label>
+                  <textarea
+                    value={it.description}
+                    onChange={(e) => {
+                      const updated = [...itineraries];
+                      updated[idx].description = e.target.value;
+                      setItineraries(updated);
+                    }}
+                    rows={3}
+                    placeholder="Detailed schedule of places visited, activities and highlights..."
+                    className="w-full bg-white border border-[#E8ECF3] rounded-xl p-3 text-xs text-[#0B1026] outline-none focus:border-[#3478F6]"
+                  />
+                </div>
+
+                {/* Day Image Uploader */}
+                <ItineraryDayUploader
+                  dayNumber={it.dayNumber}
+                  value={it.imageUrl}
+                  onChange={(url) => {
+                    const updated = [...itineraries];
+                    updated[idx].imageUrl = url;
+                    setItineraries(updated);
+                  }}
+                />
+              </div>
             </div>
           ))}
         </div>
@@ -472,7 +638,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
             <button
               type="button"
               onClick={() => setInclusions([...inclusions, ""])}
-              className="text-xs font-bold text-[#16A36A] hover:underline"
+              className="text-xs font-bold text-[#16A36A] hover:underline cursor-pointer"
             >
               + Add Item
             </button>
@@ -496,7 +662,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
                   <button
                     type="button"
                     onClick={() => setInclusions(inclusions.filter((_, i) => i !== idx))}
-                    className="text-red-500 hover:text-red-700"
+                    className="text-red-500 hover:text-red-700 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -513,7 +679,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
             <button
               type="button"
               onClick={() => setExclusions([...exclusions, ""])}
-              className="text-xs font-bold text-[#DC2626] hover:underline"
+              className="text-xs font-bold text-[#DC2626] hover:underline cursor-pointer"
             >
               + Add Item
             </button>
@@ -537,7 +703,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
                   <button
                     type="button"
                     onClick={() => setExclusions(exclusions.filter((_, i) => i !== idx))}
-                    className="text-red-500 hover:text-red-700"
+                    className="text-red-500 hover:text-red-700 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -548,12 +714,25 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
         </div>
       </div>
 
+      {/* Save Button */}
       <button
         type="submit"
-        disabled={loading}
-        className="w-full bg-[#3478F6] hover:bg-[#2563EB] text-white font-bold py-4 rounded-xl text-sm shadow-xl transition-all min-h-[48px]"
+        disabled={loading || uploadingCover}
+        className="w-full bg-[#3478F6] hover:bg-[#2563EB] text-white font-bold py-4 rounded-xl text-sm shadow-xl transition-all min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
       >
-        {loading ? "Saving Package..." : "Save Package"}
+        {uploadingCover ? (
+          <>
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span>Uploading image...</span>
+          </>
+        ) : loading ? (
+          <>
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span>Saving Package...</span>
+          </>
+        ) : (
+          <span>Save Package</span>
+        )}
       </button>
     </form>
   );

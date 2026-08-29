@@ -257,7 +257,7 @@ export interface PackageInputData {
   seoTitle?: string;
   seoDescription?: string;
   images?: Array<{ url: string; caption?: string }>;
-  itineraries?: Array<{ dayNumber?: number; title: string; description: string; image?: string; meals?: string; accommodation?: string }>;
+  itineraries?: Array<{ dayNumber?: number; title: string; description: string; image?: string | null; imageUrl?: string | null; meals?: string | null; accommodation?: string | null }>;
   inclusions?: Array<string | { text: string }>;
   exclusions?: Array<string | { text: string }>;
   faqs?: Array<{ question: string; answer: string }>;
@@ -278,17 +278,23 @@ export interface TripBatchInputData {
 
 export interface HeroSlideInputData {
   title: string;
-  subtitle?: string;
+  badgeTag?: string;
   badge?: string;
+  subtitle?: string;
   destination?: string;
   startingPrice?: number | null;
-  desktopImage: string;
+  realPrice?: number | null;
+  imageUrl?: string;
+  imagePublicId?: string;
+  desktopImage?: string;
   mobileImage?: string;
   primaryBtnText?: string;
   primaryBtnUrl?: string;
   secondaryBtnText?: string;
   secondaryBtnUrl?: string;
+  sortOrder?: number;
   displayOrder?: number;
+  isActive?: boolean;
   active?: boolean;
 }
 
@@ -299,16 +305,23 @@ export interface DestinationInputData {
   country?: string;
   shortDescription?: string;
   coverImage?: string;
+  imageUrl?: string;
+  imagePublicId?: string;
   featured?: boolean;
   active?: boolean;
+  isActive?: boolean;
   displayOrder?: number;
 }
 
 export interface GalleryImageInputData {
   title?: string;
   caption?: string;
-  url: string;
+  url?: string;
+  imageUrl?: string;
+  imagePublicId?: string;
+  altText?: string;
   category?: string;
+  categoryId?: string;
   destinationId?: string;
   albumId?: string;
   featured?: boolean;
@@ -316,18 +329,31 @@ export interface GalleryImageInputData {
   displayOrder?: number;
 }
 
+// Helper for unique slug generation
+async function generateUniqueSlug(baseTitle: string, currentId?: string): Promise<string> {
+  const baseSlug = slugify(baseTitle) || "tour-package";
+  let candidate = baseSlug;
+  let count = 2;
+
+  while (true) {
+    const existing = await db.package.findFirst({ where: { slug: candidate } });
+    if (!existing || (currentId && existing.id === currentId)) {
+      return candidate;
+    }
+    candidate = `${baseSlug}-${count}`;
+    count++;
+  }
+}
+
 // ================= PACKAGE ACTIONS =================
 export async function createPackage(data: PackageInputData) {
-
   const session = await getAdminSession();
   if (!session) return { error: "Unauthorized" };
 
   try {
-    const packageSlug = data.slug ? slugify(data.slug) : slugify(data.title);
-    const existing = await db.package.findUnique({ where: { slug: packageSlug } });
-    if (existing) {
-      return { error: "A package with this URL slug already exists." };
-    }
+    const packageSlug = data.slug
+      ? slugify(data.slug)
+      : await generateUniqueSlug(data.title);
 
     const newPkg = await db.package.create({
       data: {
@@ -365,7 +391,8 @@ export async function createPackage(data: PackageInputData) {
             dayNumber: Number(it.dayNumber) || idx + 1,
             title: it.title,
             description: it.description,
-            image: it.image || null,
+            imageUrl: it.imageUrl || it.image || null,
+            image: it.imageUrl || it.image || null,
             meals: it.meals || null,
             accommodation: it.accommodation || null,
             displayOrder: idx,
@@ -408,7 +435,10 @@ export async function updatePackage(id: string, data: PackageInputData) {
   if (!session) return { error: "Unauthorized" };
 
   try {
-    const packageSlug = data.slug ? slugify(data.slug) : slugify(data.title);
+    const existingPkg = await db.package.findUnique({ where: { id } });
+    const packageSlug = data.slug
+      ? slugify(data.slug)
+      : existingPkg?.slug || (await generateUniqueSlug(data.title, id));
 
     // Clear old relations to replace with new ones
     await db.packageItinerary.deleteMany({ where: { packageId: id } });
@@ -454,7 +484,8 @@ export async function updatePackage(id: string, data: PackageInputData) {
             dayNumber: Number(it.dayNumber) || idx + 1,
             title: it.title,
             description: it.description,
-            image: it.image || null,
+            imageUrl: it.imageUrl || it.image || null,
+            image: it.imageUrl || it.image || null,
             meals: it.meals || null,
             accommodation: it.accommodation || null,
             displayOrder: idx,
@@ -510,6 +541,10 @@ export async function createTripBatch(data: TripBatchInputData) {
   if (!session) return { error: "Unauthorized" };
 
   try {
+    if (!data.packageId || !data.packageId.trim()) {
+      return { error: "Please select a valid package for this departure batch." };
+    }
+
     const totalSeats = Number(data.totalSeats) || 30;
     const bookedSeats = Number(data.bookedSeats) || 0;
     const availableSeats = Math.max(0, totalSeats - bookedSeats);
@@ -548,26 +583,521 @@ export async function deleteTripBatch(id: string) {
   return { success: true };
 }
 
+export async function updateTripBatch(id: string, data: Partial<TripBatchInputData>) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const existing = await db.tripBatch.findUnique({ where: { id } });
+    if (!existing) return { error: "Batch not found" };
+
+    const totalSeats = data.totalSeats !== undefined ? Number(data.totalSeats) : existing.totalSeats;
+    const bookedSeats = data.bookedSeats !== undefined ? Number(data.bookedSeats) : existing.bookedSeats;
+    const availableSeats = Math.max(0, totalSeats - bookedSeats);
+
+    let status = data.status || existing.status;
+    if (availableSeats === 0) status = "SOLD_OUT";
+
+    const updated = await db.tripBatch.update({
+      where: { id },
+      data: {
+        ...(data.packageId && { packageId: data.packageId }),
+        ...(data.batchName !== undefined && { batchName: data.batchName || null }),
+        ...(data.startDate && { startDate: new Date(data.startDate) }),
+        ...(data.endDate && { endDate: new Date(data.endDate) }),
+        ...(data.priceOverride !== undefined && { priceOverride: data.priceOverride ? Number(data.priceOverride) : null }),
+        totalSeats,
+        bookedSeats,
+        availableSeats,
+        status,
+        ...(data.boardingPoint !== undefined && { boardingPoint: data.boardingPoint || null }),
+        ...(data.notes !== undefined && { notes: data.notes || null }),
+      },
+    });
+
+    revalidatePath("/upcoming-trips");
+    revalidatePath("/admin/upcoming-trips");
+    revalidatePath(`/admin/upcoming-trips/${id}`);
+    return { success: true, batch: updated };
+  } catch (error: any) {
+    return { error: error?.message || "Failed to update batch." };
+  }
+}
+
+export interface BookingInputData {
+  tripBatchId: string;
+  packageId?: string;
+  customerName: string;
+  phone: string;
+  whatsappNumber?: string;
+  email?: string;
+  gender?: string;
+  age?: number;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  emergencyName?: string;
+  emergencyPhone?: string;
+  travellerCount?: number;
+  totalAmount: number;
+  paidAmount?: number;
+  paymentMethod?: string;
+  transactionId?: string;
+  paymentStatus?: string;
+  bookingStatus?: string;
+  boardingPoint?: string;
+  pickupLocation?: string;
+  transportType?: string;
+  trainName?: string;
+  trainNumber?: string;
+  coach?: string;
+  seatNumber?: string;
+  boardingTime?: string;
+  airportName?: string;
+  flightNumber?: string;
+  busOperator?: string;
+  checkInStatus?: string;
+  notes?: string;
+}
+
+export async function createBatchBooking(data: BookingInputData) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    if (!data.tripBatchId) return { error: "Trip batch is required." };
+    if (!data.customerName || !data.customerName.trim()) return { error: "Full Name is required." };
+    if (!data.phone || !data.phone.trim()) return { error: "Phone Number is required." };
+
+    const batch = await db.tripBatch.findUnique({
+      where: { id: data.tripBatchId },
+      include: { package: true },
+    });
+    if (!batch) return { error: "Associated trip batch not found." };
+
+    const pkg = batch.package || (batch.packageId ? await db.package.findUnique({ where: { id: batch.packageId } }) : null);
+    const unitPrice = Number(batch.priceOverride) || Number(pkg?.price) || 0;
+    const travellerCount = Math.max(1, Number(data.travellerCount) || 1);
+
+    // Secure server-side calculation: Total = unit price * traveller count
+    const totalAmount = unitPrice * travellerCount;
+    const paidAmount = Number(data.paidAmount) || 0;
+    const balanceAmount = Math.max(0, totalAmount - paidAmount);
+
+    let paymentStatus = "Pending";
+    if (paidAmount >= totalAmount && totalAmount > 0) {
+      paymentStatus = "Paid";
+    } else if (paidAmount > 0) {
+      paymentStatus = "Partially Paid";
+    }
+
+    const bookingRef = generateBookingRef();
+    const payments = paidAmount > 0 ? [{
+      amount: paidAmount,
+      method: data.paymentMethod || "Cash",
+      transactionId: data.transactionId || null,
+      paidAt: new Date(),
+      notes: "Initial payment during booking creation",
+    }] : [];
+
+    const booking = await db.booking.create({
+      data: {
+        bookingRef,
+        tripBatchId: data.tripBatchId,
+        packageId: data.packageId || batch.packageId || null,
+        customerName: data.customerName.trim(),
+        name: data.customerName.trim(),
+        phone: data.phone.trim(),
+        whatsappNumber: data.whatsappNumber || data.phone.trim(),
+        email: data.email || null,
+        gender: data.gender || null,
+        age: data.age ? Number(data.age) : null,
+        address: data.address || null,
+        city: data.city || null,
+        state: data.state || null,
+        pincode: data.pincode || null,
+        emergencyName: data.emergencyName || null,
+        emergencyPhone: data.emergencyPhone || null,
+        travellerCount,
+        totalAmount,
+        paidAmount,
+        balanceAmount,
+        paymentStatus,
+        bookingStatus: data.bookingStatus || "Confirmed",
+        status: data.bookingStatus || "Confirmed",
+        boardingPoint: data.boardingPoint || batch.boardingPoint || null,
+        pickupLocation: data.pickupLocation || null,
+        transportType: data.transportType || "Train",
+        trainName: data.trainName || null,
+        trainNumber: data.trainNumber || null,
+        coach: data.coach || null,
+        seatNumber: data.seatNumber || null,
+        boardingTime: data.boardingTime || null,
+        airportName: data.airportName || null,
+        flightNumber: data.flightNumber || null,
+        busOperator: data.busOperator || null,
+        checkInStatus: data.checkInStatus || "Not Checked In",
+        notes: data.notes || null,
+        payments,
+      },
+    });
+
+    // Recalculate trip batch seats
+    const allBookings = await db.booking.findMany({ where: { tripBatchId: data.tripBatchId } });
+    const totalBookedSeats = allBookings
+      .filter((b: any) => b.bookingStatus !== "Cancelled" && b.status !== "CANCELLED")
+      .reduce((sum: number, b: any) => sum + (b.travellerCount || 1), 0);
+
+    const availableSeats = Math.max(0, batch.totalSeats - totalBookedSeats);
+    const newBatchStatus = availableSeats === 0 ? "SOLD_OUT" : (availableSeats <= 5 ? "FILLING_FAST" : "OPEN");
+
+    await db.tripBatch.update({
+      where: { id: data.tripBatchId },
+      data: {
+        bookedSeats: totalBookedSeats,
+        availableSeats,
+        status: newBatchStatus,
+      },
+    });
+
+    revalidatePath("/admin/upcoming-trips");
+    revalidatePath(`/admin/upcoming-trips/${data.tripBatchId}`);
+    return { success: true, booking };
+  } catch (error: any) {
+    console.error("Error creating batch booking:", error);
+    return { error: error?.message || "Failed to create traveller booking." };
+  }
+}
+
+export async function updateBatchBooking(id: string, data: Partial<BookingInputData>) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const existing = await db.booking.findUnique({ where: { id } });
+    if (!existing) return { error: "Booking not found" };
+
+    const tripBatchId = data.tripBatchId || existing.tripBatchId;
+    const batch = tripBatchId
+      ? await db.tripBatch.findUnique({ where: { id: tripBatchId }, include: { package: true } })
+      : null;
+    const pkg = batch?.package || (batch?.packageId ? await db.package.findUnique({ where: { id: batch.packageId } }) : null);
+
+    const unitPrice = Number(batch?.priceOverride) || Number(pkg?.price) || (existing.totalAmount / (existing.travellerCount || 1)) || 0;
+    const travellerCount = data.travellerCount !== undefined ? Math.max(1, Number(data.travellerCount)) : (existing.travellerCount || 1);
+
+    // Secure server-side recalculation
+    const totalAmount = unitPrice * travellerCount;
+
+    const payments = Array.isArray(existing.payments) ? existing.payments : [];
+    const totalPaidHistory = payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+
+    const paidAmount = data.paidAmount !== undefined ? Number(data.paidAmount) : Math.max(totalPaidHistory, Number(existing.paidAmount) || 0);
+    const balanceAmount = Math.max(0, totalAmount - paidAmount);
+
+    let paymentStatus = "Pending";
+    if (paidAmount >= totalAmount && totalAmount > 0) {
+      paymentStatus = "Paid";
+    } else if (paidAmount > 0) {
+      paymentStatus = "Partially Paid";
+    }
+
+    const updated = await db.booking.update({
+      where: { id },
+      data: {
+        ...(data.customerName && { customerName: data.customerName, name: data.customerName }),
+        ...(data.phone && { phone: data.phone }),
+        ...(data.whatsappNumber !== undefined && { whatsappNumber: data.whatsappNumber }),
+        ...(data.email !== undefined && { email: data.email }),
+        ...(data.gender !== undefined && { gender: data.gender }),
+        ...(data.age !== undefined && { age: data.age ? Number(data.age) : null }),
+        ...(data.address !== undefined && { address: data.address }),
+        ...(data.city !== undefined && { city: data.city }),
+        ...(data.state !== undefined && { state: data.state }),
+        ...(data.pincode !== undefined && { pincode: data.pincode }),
+        ...(data.emergencyName !== undefined && { emergencyName: data.emergencyName }),
+        ...(data.emergencyPhone !== undefined && { emergencyPhone: data.emergencyPhone }),
+        ...(data.travellerCount !== undefined && { travellerCount: Number(data.travellerCount) }),
+        totalAmount,
+        paidAmount,
+        balanceAmount,
+        paymentStatus,
+        ...(data.bookingStatus && { bookingStatus: data.bookingStatus, status: data.bookingStatus }),
+        ...(data.boardingPoint !== undefined && { boardingPoint: data.boardingPoint }),
+        ...(data.pickupLocation !== undefined && { pickupLocation: data.pickupLocation }),
+        ...(data.transportType !== undefined && { transportType: data.transportType }),
+        ...(data.trainName !== undefined && { trainName: data.trainName }),
+        ...(data.trainNumber !== undefined && { trainNumber: data.trainNumber }),
+        ...(data.coach !== undefined && { coach: data.coach }),
+        ...(data.seatNumber !== undefined && { seatNumber: data.seatNumber }),
+        ...(data.boardingTime !== undefined && { boardingTime: data.boardingTime }),
+        ...(data.airportName !== undefined && { airportName: data.airportName }),
+        ...(data.flightNumber !== undefined && { flightNumber: data.flightNumber }),
+        ...(data.busOperator !== undefined && { busOperator: data.busOperator }),
+        ...(data.checkInStatus !== undefined && { checkInStatus: data.checkInStatus }),
+        ...(data.notes !== undefined && { notes: data.notes }),
+      },
+    });
+
+    if (existing.tripBatchId) {
+      const batch = await db.tripBatch.findUnique({ where: { id: existing.tripBatchId } });
+      if (batch) {
+        const allBookings = await db.booking.findMany({ where: { tripBatchId: existing.tripBatchId } });
+        const totalBookedSeats = allBookings
+          .filter((b: any) => b.bookingStatus !== "Cancelled" && b.status !== "CANCELLED")
+          .reduce((sum: number, b: any) => sum + (b.travellerCount || 1), 0);
+
+        const availableSeats = Math.max(0, batch.totalSeats - totalBookedSeats);
+        const newBatchStatus = availableSeats === 0 ? "SOLD_OUT" : (availableSeats <= 5 ? "FILLING_FAST" : "OPEN");
+
+        await db.tripBatch.update({
+          where: { id: existing.tripBatchId },
+          data: {
+            bookedSeats: totalBookedSeats,
+            availableSeats,
+            status: newBatchStatus,
+          },
+        });
+      }
+    }
+
+    revalidatePath("/admin/upcoming-trips");
+    if (existing.tripBatchId) {
+      revalidatePath(`/admin/upcoming-trips/${existing.tripBatchId}`);
+    }
+    return { success: true, booking: updated };
+  } catch (error: any) {
+    console.error("Error updating batch booking:", error);
+    return { error: error?.message || "Failed to update traveller booking." };
+  }
+}
+
+export async function addPaymentToBooking(
+  bookingId: string,
+  paymentData: { amount: number; method: string; transactionId?: string; notes?: string }
+) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const booking = await db.booking.findUnique({ where: { id: bookingId } });
+    if (!booking) return { error: "Booking not found" };
+
+    const newPayment = {
+      amount: Number(paymentData.amount) || 0,
+      method: paymentData.method || "Cash",
+      transactionId: paymentData.transactionId || null,
+      paidAt: new Date(),
+      notes: paymentData.notes || null,
+    };
+
+    const existingPayments = Array.isArray(booking.payments) ? booking.payments : [];
+    const updatedPayments = [...existingPayments, newPayment];
+
+    const totalPaid = updatedPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const totalAmount = Number(booking.totalAmount) || 0;
+    const balanceAmount = Math.max(0, totalAmount - totalPaid);
+
+    let paymentStatus = "Pending";
+    if (totalPaid >= totalAmount && totalAmount > 0) {
+      paymentStatus = "Paid";
+    } else if (totalPaid > 0) {
+      paymentStatus = "Partially Paid";
+    }
+
+    const updated = await db.booking.update({
+      where: { id: bookingId },
+      data: {
+        payments: updatedPayments,
+        paidAmount: totalPaid,
+        balanceAmount,
+        paymentStatus,
+      },
+    });
+
+    revalidatePath("/admin/upcoming-trips");
+    if (booking.tripBatchId) {
+      revalidatePath(`/admin/upcoming-trips/${booking.tripBatchId}`);
+    }
+    return { success: true, booking: updated };
+  } catch (error: any) {
+    console.error("Error adding payment:", error);
+    return { error: error?.message || "Failed to record payment." };
+  }
+}
+
+export async function deleteBatchBooking(id: string) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const booking = await db.booking.findUnique({ where: { id } });
+    await db.booking.delete({ where: { id } });
+
+    if (booking?.tripBatchId) {
+      const batch = await db.tripBatch.findUnique({ where: { id: booking.tripBatchId } });
+      if (batch) {
+        const allBookings = await db.booking.findMany({ where: { tripBatchId: booking.tripBatchId } });
+        const totalBookedSeats = allBookings
+          .filter((b: any) => b.bookingStatus !== "Cancelled" && b.status !== "CANCELLED")
+          .reduce((sum: number, b: any) => sum + (b.travellerCount || 1), 0);
+
+        const availableSeats = Math.max(0, batch.totalSeats - totalBookedSeats);
+        const newBatchStatus = availableSeats === 0 ? "SOLD_OUT" : (availableSeats <= 5 ? "FILLING_FAST" : "OPEN");
+
+        await db.tripBatch.update({
+          where: { id: booking.tripBatchId },
+          data: {
+            bookedSeats: totalBookedSeats,
+            availableSeats,
+            status: newBatchStatus,
+          },
+        });
+      }
+      revalidatePath(`/admin/upcoming-trips/${booking.tripBatchId}`);
+    }
+
+    revalidatePath("/admin/upcoming-trips");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting booking:", error);
+    return { error: error?.message || "Failed to delete booking." };
+  }
+}
+
+export async function addTravellerToBookingList(
+  bookingId: string,
+  travellerData: { name: string; age?: number; gender?: string; phone?: string; boardingPoint?: string; transportType?: string; seatNumber?: string }
+) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const booking = await db.booking.findUnique({ where: { id: bookingId } });
+    if (!booking) return { error: "Booking not found" };
+
+    const newTraveller = {
+      id: `TRV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      name: travellerData.name.trim(),
+      age: travellerData.age ? Number(travellerData.age) : null,
+      gender: travellerData.gender || "Male",
+      phone: travellerData.phone ? travellerData.phone.trim() : null,
+      boardingPoint: travellerData.boardingPoint || booking.boardingPoint || null,
+      transportType: travellerData.transportType || booking.transportType || "Train",
+      seatNumber: travellerData.seatNumber || null,
+      checkInStatus: "Not Checked In",
+    };
+
+    const existingTravellers = Array.isArray(booking.travellers) ? booking.travellers : [];
+    const updatedTravellers = [...existingTravellers, newTraveller];
+    const newTravellerCount = updatedTravellers.length;
+
+    const updated = await db.booking.update({
+      where: { id: bookingId },
+      data: {
+        travellers: updatedTravellers,
+        travellerCount: newTravellerCount,
+      },
+    });
+
+    if (booking.tripBatchId) {
+      const batch = await db.tripBatch.findUnique({ where: { id: booking.tripBatchId } });
+      if (batch) {
+        const allBookings = await db.booking.findMany({ where: { tripBatchId: booking.tripBatchId } });
+        const totalBookedSeats = allBookings
+          .filter((b: any) => b.bookingStatus !== "Cancelled" && b.status !== "CANCELLED")
+          .reduce((sum: number, b: any) => sum + (b.travellerCount || 1), 0);
+
+        const availableSeats = Math.max(0, batch.totalSeats - totalBookedSeats);
+        const newBatchStatus = availableSeats === 0 ? "SOLD_OUT" : (availableSeats <= 5 ? "FILLING_FAST" : "OPEN");
+
+        await db.tripBatch.update({
+          where: { id: booking.tripBatchId },
+          data: {
+            bookedSeats: totalBookedSeats,
+            availableSeats,
+            status: newBatchStatus,
+          },
+        });
+      }
+      revalidatePath(`/admin/upcoming-trips/${booking.tripBatchId}`);
+      revalidatePath(`/admin/upcoming-trips/${booking.tripBatchId}/customers/${bookingId}`);
+    }
+
+    return { success: true, booking: updated };
+  } catch (error: any) {
+    console.error("Error adding traveller to booking:", error);
+    return { error: error?.message || "Failed to add traveller." };
+  }
+}
+
+export async function toggleCheckInStatus(bookingId: string, checkInStatus: string, travellerId?: string) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const booking = await db.booking.findUnique({ where: { id: bookingId } });
+    if (!booking) return { error: "Booking not found" };
+
+    let updatedTravellers = Array.isArray(booking.travellers) ? [...booking.travellers] : [];
+
+    if (travellerId && updatedTravellers.length > 0) {
+      updatedTravellers = updatedTravellers.map((t: any) =>
+        t.id === travellerId ? { ...t, checkInStatus } : t
+      );
+    }
+
+    const updated = await db.booking.update({
+      where: { id: bookingId },
+      data: {
+        checkInStatus,
+        ...(updatedTravellers.length > 0 && { travellers: updatedTravellers }),
+      },
+    });
+
+    if (booking.tripBatchId) {
+      revalidatePath(`/admin/upcoming-trips/${booking.tripBatchId}`);
+      revalidatePath(`/admin/upcoming-trips/${booking.tripBatchId}/customers/${bookingId}`);
+    }
+    return { success: true, booking: updated };
+  } catch (error: any) {
+    console.error("Error updating check-in status:", error);
+    return { error: error?.message || "Failed to update check-in status." };
+  }
+}
+
 // ================= HERO SLIDE ACTIONS =================
 export async function createHeroSlide(data: HeroSlideInputData) {
   const session = await getAdminSession();
   if (!session) return { error: "Unauthorized" };
 
+  const image = data.imageUrl || data.desktopImage || "";
+  const bTag = data.badgeTag || data.badge || null;
+  const order = data.sortOrder !== undefined ? data.sortOrder : (data.displayOrder || 0);
+  const isAct = data.isActive !== undefined ? data.isActive : (data.active !== undefined ? data.active : true);
+
   const slide = await db.heroSlide.create({
     data: {
       title: data.title,
+      badgeTag: bTag,
+      badge: bTag,
       subtitle: data.subtitle || null,
-      badge: data.badge || null,
       destination: data.destination || null,
-      startingPrice: data.startingPrice ? Number(data.startingPrice) : null,
-      desktopImage: data.desktopImage,
+      startingPrice: data.startingPrice !== undefined && data.startingPrice !== null ? Number(data.startingPrice) : null,
+      realPrice: data.realPrice !== undefined && data.realPrice !== null ? Number(data.realPrice) : null,
+      imageUrl: image,
+      imagePublicId: data.imagePublicId || null,
+      desktopImage: image,
       mobileImage: data.mobileImage || null,
       primaryBtnText: data.primaryBtnText || "Explore Package",
       primaryBtnUrl: data.primaryBtnUrl || "/packages",
       secondaryBtnText: data.secondaryBtnText || null,
       secondaryBtnUrl: data.secondaryBtnUrl || null,
-      displayOrder: Number(data.displayOrder) || 0,
-      active: Boolean(data.active),
+      sortOrder: Number(order) || 0,
+      displayOrder: Number(order) || 0,
+      isActive: Boolean(isAct),
+      active: Boolean(isAct),
     },
   });
 
@@ -586,41 +1116,7 @@ export async function deleteHeroSlide(id: string) {
   return { success: true };
 }
 
-// ================= DESTINATION ACTIONS =================
-export async function createDestination(data: DestinationInputData) {
-  const session = await getAdminSession();
-  if (!session) return { error: "Unauthorized" };
-
-  const destSlug = data.slug ? slugify(data.slug) : slugify(data.name);
-  const dest = await db.destination.create({
-    data: {
-      name: data.name,
-      slug: destSlug,
-      state: data.state,
-      country: data.country || "India",
-      shortDescription: data.shortDescription || null,
-      coverImage: data.coverImage || null,
-      featured: Boolean(data.featured),
-      active: Boolean(data.active),
-      displayOrder: Number(data.displayOrder) || 0,
-    },
-  });
-
-  revalidatePath("/");
-  revalidatePath("/packages");
-  revalidatePath("/admin/destinations");
-  return { success: true, destination: dest };
-}
-
-export async function deleteDestination(id: string) {
-  const session = await getAdminSession();
-  if (!session) return { error: "Unauthorized" };
-
-  await db.destination.delete({ where: { id } });
-  revalidatePath("/");
-  revalidatePath("/admin/destinations");
-  return { success: true };
-}
+// (Destination Actions defined below)
 
 // ================= SITE SETTINGS ACTIONS =================
 export async function updateSiteSettings(settings: Record<string, string>) {
@@ -641,131 +1137,320 @@ export async function updateSiteSettings(settings: Record<string, string>) {
 }
 
 // ================= GALLERY ACTIONS =================
+export async function quickCreateGalleryCategory(rawName: string) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized access" };
+
+  const name = rawName.trim();
+  if (!name) return { error: "Category name is required." };
+
+  const slug = slugify(name);
+
+  try {
+    const allCategories = await db.galleryCategory.findMany();
+    const existing = allCategories.find(
+      (c: any) =>
+        c.name?.trim().toLowerCase() === name.toLowerCase() ||
+        c.slug?.trim().toLowerCase() === slug.toLowerCase()
+    );
+
+    if (existing) {
+      return { category: existing };
+    }
+
+    const newCat = await db.galleryCategory.create({
+      data: {
+        name,
+        slug,
+      },
+    });
+
+    revalidatePath("/gallery");
+    revalidatePath("/admin/gallery");
+    return { category: newCat };
+  } catch (err: any) {
+    console.error("Error quick-creating category:", err);
+    return { error: err?.message || "Failed to create category." };
+  }
+}
+
 export async function createGalleryImage(data: GalleryImageInputData) {
   const session = await getAdminSession();
   if (!session) return { error: "Unauthorized" };
 
-  const img = await db.galleryImage.create({
-    data: {
-      title: data.title || null,
-      caption: data.caption || null,
-      url: data.url,
-      category: data.category || "Tours",
-      destinationId: data.destinationId || null,
-      albumId: data.albumId || null,
-      featured: Boolean(data.featured),
-      published: Boolean(data.published ?? true),
-      displayOrder: Number(data.displayOrder) || 0,
-    },
-  });
+  const imgUrl = data.imageUrl || data.url;
+  if (!imgUrl || !imgUrl.trim()) {
+    return { error: "Gallery image is required." };
+  }
 
-  revalidatePath("/");
-  revalidatePath("/gallery");
-  revalidatePath("/admin/gallery");
-  return { success: true, image: img };
+  const categoryName = data.category ? data.category.trim() : "General";
+
+  try {
+    const altText = data.altText?.trim() || data.title?.trim() || data.caption?.trim() || "Gallery Photo";
+
+    const img = await db.galleryImage.create({
+      data: {
+        title: data.title?.trim() || null,
+        caption: data.caption?.trim() || null,
+        url: imgUrl.trim(),
+        imageUrl: imgUrl.trim(),
+        imagePublicId: data.imagePublicId ? data.imagePublicId.trim() : null,
+        altText,
+        category: categoryName,
+        categoryId: data.categoryId || null,
+        destinationId: data.destinationId || null,
+        albumId: data.albumId || null,
+        featured: Boolean(data.featured),
+        published: Boolean(data.published ?? true),
+        displayOrder: Number(data.displayOrder) || 0,
+      },
+    });
+
+    revalidatePath("/");
+    revalidatePath("/gallery");
+    revalidatePath("/admin/gallery");
+    return { success: true, image: img };
+  } catch (error: any) {
+    console.error("Create gallery image error:", error);
+    return { error: error?.message || "Failed to create gallery photo." };
+  }
+}
+
+export async function updateGalleryImage(id: string, data: Partial<GalleryImageInputData>) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const existing = await db.galleryImage.findUnique({ where: { id } });
+    if (!existing) return { error: "Gallery image not found" };
+
+    const imgUrl = data.imageUrl || data.url || existing.imageUrl || existing.url;
+    if (!imgUrl) return { error: "Gallery image is required." };
+
+    const categoryName = data.category !== undefined ? data.category.trim() : existing.category;
+
+    const updated = await db.galleryImage.update({
+      where: { id },
+      data: {
+        ...(data.title !== undefined && { title: data.title.trim() || null }),
+        ...(data.caption !== undefined && { caption: data.caption.trim() || null }),
+        url: imgUrl,
+        imageUrl: imgUrl,
+        ...(data.imagePublicId !== undefined && { imagePublicId: data.imagePublicId || null }),
+        ...(data.altText !== undefined && { altText: data.altText.trim() || null }),
+        category: categoryName,
+        ...(data.categoryId !== undefined && { categoryId: data.categoryId || null }),
+        ...(data.destinationId !== undefined && { destinationId: data.destinationId || null }),
+        ...(data.featured !== undefined && { featured: Boolean(data.featured) }),
+        ...(data.published !== undefined && { published: Boolean(data.published) }),
+      },
+    });
+
+    revalidatePath("/");
+    revalidatePath("/gallery");
+    revalidatePath("/admin/gallery");
+    return { success: true, image: updated };
+  } catch (error: any) {
+    console.error("Update gallery image error:", error);
+    return { error: error?.message || "Failed to update gallery photo." };
+  }
 }
 
 export async function deleteGalleryImage(id: string) {
   const session = await getAdminSession();
   if (!session) return { error: "Unauthorized" };
 
-  await db.galleryImage.delete({ where: { id } });
-  revalidatePath("/gallery");
-  revalidatePath("/admin/gallery");
-  return { success: true };
-}
-
-// ================= CALENDAR EVENT ACTIONS =================
-export interface CalendarEventInputData {
-  title: string;
-  slug?: string;
-  eventType?: string;
-  startDate: Date | string;
-  endDate: Date | string;
-  description?: string;
-  color?: string;
-  status?: string;
-  packageId?: string;
-  tripBatchId?: string;
-  isActive?: boolean;
-}
-
-export async function createCalendarEvent(data: CalendarEventInputData) {
-  const session = await getAdminSession();
-  if (!session) return { error: "Unauthorized" };
-
   try {
-    const eventSlug = data.slug ? slugify(data.slug) : slugify(`${data.title}-${Date.now().toString().slice(-4)}`);
-    const event = await db.calendarEvent.create({
-      data: {
-        title: data.title,
-        slug: eventSlug,
-        eventType: data.eventType || "SPECIAL_EVENT",
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        description: data.description || null,
-        color: data.color || null,
-        status: data.status || "OPEN",
-        packageId: data.packageId || null,
-        tripBatchId: data.tripBatchId || null,
-        isActive: Boolean(data.isActive ?? true),
-      },
-    });
+    const existing = await db.galleryImage.findUnique({ where: { id } });
+    if (!existing) return { error: "Gallery image not found" };
 
-    revalidatePath("/");
-    revalidatePath("/upcoming-trips");
-    revalidatePath("/admin/calendar");
-    return { success: true, event };
-  } catch (error) {
-    console.error("Error creating calendar event:", error);
-    return { error: "Failed to create calendar event." };
+    await db.galleryImage.delete({ where: { id } });
+
+    // Clean up Cloudinary asset if publicId is present
+    if (existing.imagePublicId) {
+      try {
+        const { cloudinary } = await import("@/lib/cloudinary");
+        await cloudinary.uploader.destroy(existing.imagePublicId);
+      } catch (cloudErr) {
+        console.error("Failed to delete Cloudinary gallery image:", cloudErr);
+      }
+    }
+
+    revalidatePath("/gallery");
+    revalidatePath("/admin/gallery");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Delete gallery image error:", error);
+    return { error: error?.message || "Failed to delete gallery photo." };
   }
 }
 
-export async function updateCalendarEvent(id: string, data: Partial<CalendarEventInputData>) {
+export async function createDestination(data: DestinationInputData) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  const name = (data.name || "").trim();
+  if (!name) return { error: "Destination name is required." };
+
+  const slug = data.slug ? slugify(data.slug) : slugify(name);
+
+  try {
+    const allDestinations = await db.destination.findMany();
+    const existing = allDestinations.find(
+      (d: any) =>
+        d.name?.trim().toLowerCase() === name.toLowerCase() ||
+        d.slug?.trim().toLowerCase() === slug.toLowerCase()
+    );
+
+    if (existing) {
+      return { error: "Destination already exists." };
+    }
+
+    const image = data.imageUrl || data.coverImage || null;
+    const isAct = data.active !== undefined ? data.active : (data.isActive !== undefined ? data.isActive : true);
+
+    const newDest = await db.destination.create({
+      data: {
+        name,
+        slug,
+        state: (data.state || "").trim(),
+        country: (data.country || "India").trim(),
+        shortDescription: data.shortDescription || null,
+        coverImage: image,
+        imageUrl: image,
+        imagePublicId: data.imagePublicId || null,
+        featured: Boolean(data.featured),
+        active: isAct,
+        isActive: isAct,
+        displayOrder: Number(data.displayOrder) || 0,
+      },
+    });
+
+    revalidatePath("/admin/destinations");
+    revalidatePath("/admin/packages");
+    revalidatePath("/destinations");
+    return { success: true, destination: newDest };
+  } catch (error: any) {
+    console.error("Create destination error:", error);
+    return { error: error?.message || "Failed to create destination." };
+  }
+}
+
+export async function updateDestination(id: string, data: Partial<DestinationInputData>) {
   const session = await getAdminSession();
   if (!session) return { error: "Unauthorized" };
 
   try {
-    const event = await db.calendarEvent.update({
+    const existingDest = await db.destination.findUnique({ where: { id } });
+    if (!existingDest) return { error: "Destination not found" };
+
+    const name = data.name !== undefined ? data.name.trim() : existingDest.name;
+    if (!name) return { error: "Destination name is required." };
+
+    const slug = data.slug ? slugify(data.slug) : slugify(name);
+
+    const allDestinations = await db.destination.findMany();
+    const duplicate = allDestinations.find(
+      (d: any) =>
+        d.id !== id &&
+        (d.name?.trim().toLowerCase() === name.toLowerCase() ||
+          d.slug?.trim().toLowerCase() === slug.toLowerCase())
+    );
+
+    if (duplicate) {
+      return { error: "Destination already exists." };
+    }
+
+    const image = data.imageUrl !== undefined ? data.imageUrl : (data.coverImage !== undefined ? data.coverImage : existingDest.imageUrl);
+    const isAct = data.active !== undefined ? data.active : (data.isActive !== undefined ? data.isActive : existingDest.active);
+
+    const updated = await db.destination.update({
       where: { id },
       data: {
-        ...(data.title && { title: data.title }),
-        ...(data.eventType && { eventType: data.eventType }),
-        ...(data.startDate && { startDate: new Date(data.startDate) }),
-        ...(data.endDate && { endDate: new Date(data.endDate) }),
-        ...(data.description !== undefined && { description: data.description || null }),
-        ...(data.color !== undefined && { color: data.color || null }),
-        ...(data.status && { status: data.status }),
-        ...(data.packageId !== undefined && { packageId: data.packageId || null }),
-        ...(data.tripBatchId !== undefined && { tripBatchId: data.tripBatchId || null }),
-        ...(data.isActive !== undefined && { isActive: Boolean(data.isActive) }),
+        name,
+        slug,
+        ...(data.state !== undefined && { state: data.state.trim() }),
+        ...(data.country !== undefined && { country: data.country.trim() }),
+        ...(data.shortDescription !== undefined && { shortDescription: data.shortDescription || null }),
+        coverImage: image,
+        imageUrl: image,
+        ...(data.imagePublicId !== undefined && { imagePublicId: data.imagePublicId || null }),
+        ...(data.featured !== undefined && { featured: Boolean(data.featured) }),
+        active: isAct,
+        isActive: isAct,
+        ...(data.displayOrder !== undefined && { displayOrder: Number(data.displayOrder) }),
       },
     });
 
-    revalidatePath("/");
-    revalidatePath("/upcoming-trips");
-    revalidatePath("/admin/calendar");
-    return { success: true, event };
-  } catch (error) {
-    console.error("Error updating calendar event:", error);
-    return { error: "Failed to update calendar event." };
+    revalidatePath("/admin/destinations");
+    revalidatePath("/admin/packages");
+    revalidatePath("/destinations");
+    return { success: true, destination: updated };
+  } catch (error: any) {
+    console.error("Update destination error:", error);
+    return { error: error?.message || "Failed to update destination." };
   }
 }
 
-export async function deleteCalendarEvent(id: string) {
+export async function deleteDestination(id: string) {
   const session = await getAdminSession();
   if (!session) return { error: "Unauthorized" };
 
   try {
-    await db.calendarEvent.delete({ where: { id } });
-    revalidatePath("/");
-    revalidatePath("/upcoming-trips");
-    revalidatePath("/admin/calendar");
+    const linkedPackagesCount = await db.package.count({ where: { destinationId: id } });
+    if (linkedPackagesCount > 0) {
+      return {
+        error: `This destination is used by ${linkedPackagesCount} package${linkedPackagesCount === 1 ? "" : "s"}. Please reassign or delete linked packages first.`,
+      };
+    }
+
+    await db.destination.delete({ where: { id } });
+    revalidatePath("/admin/destinations");
+    revalidatePath("/admin/packages");
+    revalidatePath("/destinations");
     return { success: true };
-  } catch (error) {
-    console.error("Error deleting calendar event:", error);
-    return { error: "Failed to delete calendar event." };
+  } catch (error: any) {
+    console.error("Delete destination error:", error);
+    return { error: error?.message || "Failed to delete destination." };
   }
 }
+
+export async function quickCreateDestination(rawName: string) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized access" };
+
+  const name = rawName.trim();
+  if (!name) return { error: "Destination name is required." };
+
+  const slug = slugify(name);
+
+  try {
+    const allDestinations = await db.destination.findMany();
+    const existing = allDestinations.find(
+      (d: any) =>
+        d.name?.trim().toLowerCase() === name.toLowerCase() ||
+        d.slug?.trim().toLowerCase() === slug.toLowerCase()
+    );
+
+    if (existing) {
+      return { destination: existing };
+    }
+
+    const newDest = await db.destination.create({
+      data: {
+        name,
+        slug,
+        active: true,
+      },
+    });
+
+    revalidatePath("/admin/destinations");
+    revalidatePath("/admin/packages");
+    return { destination: newDest };
+  } catch (err: any) {
+    console.error("Error quick-creating destination:", err);
+    return { error: err?.message || "Failed to create destination." };
+  }
+}
+
 

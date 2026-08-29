@@ -31,7 +31,6 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Packages", href: "/admin/packages", icon: Package },
     { name: "Upcoming Trips", href: "/admin/upcoming-trips", icon: Calendar },
-    { name: "Calendar Events", href: "/admin/calendar", icon: Calendar },
     { name: "Destinations", href: "/admin/destinations", icon: MapPin },
     { name: "Hero Slides", href: "/admin/hero-slides", icon: Sliders },
     { name: "Gallery", href: "/admin/gallery", icon: ImageIcon },
@@ -41,7 +40,6 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
     { name: "Website Settings", href: "/admin/settings", icon: Settings },
   ];
 
-
   async function handleLogout() {
     await logoutAdmin();
     router.push("/admin/login");
@@ -49,10 +47,10 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
   }
 
   return (
-    <aside className="w-64 bg-[#050A24] text-white flex flex-col justify-between min-h-screen p-4 border-r border-white/10">
+    <aside className="w-64 bg-[#050A24] text-white flex flex-col justify-between h-full overflow-y-auto p-4 border-r border-white/10 shrink-0">
       <div className="space-y-6">
-        {/* Header Branding */}
-        <div className="flex items-center justify-between px-2 pt-2">
+        {/* Desktop Sidebar Logo Container */}
+        <div className="h-[88px] px-2 flex items-center justify-between border-b border-white/10 shrink-0">
           <Link href="/admin/dashboard" className="inline-flex items-center shrink-0 min-w-0">
             <BrandLogo variant="admin" />
           </Link>
@@ -60,7 +58,7 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
           {onCloseMobile && (
             <button
               onClick={onCloseMobile}
-              className="lg:hidden text-gray-400 hover:text-white"
+              className="lg:hidden text-gray-400 hover:text-white p-1 rounded-lg"
             >
               <X className="w-5 h-5" />
             </button>
@@ -103,7 +101,7 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
 
         <button
           onClick={handleLogout}
-          className="w-full bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors"
+          className="w-full bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer"
         >
           <LogOut className="w-4 h-4" />
           <span>Sign Out</span>

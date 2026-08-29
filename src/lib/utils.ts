@@ -37,3 +37,25 @@ export function slugify(text: string): string {
     .replace(/[\s_-]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
+
+export function normalizeWhatsAppNumber(rawNumber?: string | null): string {
+  if (!rawNumber) return "";
+  let digits = rawNumber.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10) {
+    digits = "91" + digits;
+  } else if (digits.length === 11 && digits.startsWith("0")) {
+    digits = "91" + digits.slice(1);
+  }
+  return digits;
+}
+
+export function getWhatsAppLink(rawNumber?: string | null, customText?: string): string {
+  const normalized = normalizeWhatsAppNumber(rawNumber);
+  if (!normalized) return "#";
+  const baseUrl = `https://wa.me/${normalized}`;
+  if (customText) {
+    return `${baseUrl}?text=${encodeURIComponent(customText)}`;
+  }
+  return baseUrl;
+}

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { getSiteUrl, absoluteUrl } from "@/lib/seo";
@@ -10,6 +10,13 @@ const inter = Inter({
 });
 
 const siteUrl = getSiteUrl();
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -30,11 +37,6 @@ export const metadata: Metadata = {
     "Kashmir trip package",
   ],
   authors: [{ name: "Dexplora Tour Planners" }],
-  icons: {
-    icon: "/images/logo/logo.png",
-    shortcut: "/images/logo/logo.png",
-    apple: "/images/logo/logo.png",
-  },
   openGraph: {
     title: "Dexplora Tour Planners | Budget Group Trips Across India",
     description:
@@ -100,8 +102,8 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-white text-[#0B1026]">
+    <html lang="en" data-scroll-behavior="smooth" className={`${inter.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-white text-[#0B1026] overflow-x-hidden max-w-full w-full">
         <JsonLd data={globalOrganizationSchema} />
         <JsonLd data={globalWebSiteSchema} />
         {children}

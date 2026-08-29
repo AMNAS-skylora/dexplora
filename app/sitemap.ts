@@ -58,7 +58,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       select: { slug: true, updatedAt: true },
     });
 
-    const packageRoutes: MetadataRoute.Sitemap = packages.map((pkg) => ({
+    const packageRoutes: MetadataRoute.Sitemap = packages.map((pkg: any) => ({
       url: `${siteUrl}/packages/${pkg.slug}`,
       lastModified: pkg.updatedAt || new Date(),
       changeFrequency: "weekly",
