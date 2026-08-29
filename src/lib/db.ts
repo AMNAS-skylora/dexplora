@@ -1,37 +1,32 @@
 import { MongoClient, ObjectId } from "mongodb";
 
-const uri = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
-if (!uri) {
-  console.warn("MongoDB connection URI is missing from environment variables.");
-}
-
-let client: MongoClient;
-let clientPromise: Promise<MongoClient>;
+let client: MongoClient | null = null;
+let clientPromise: Promise<MongoClient> | null = null;
 
 declare global {
   var _mongoClient: MongoClient | undefined;
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
-if (process.env.NODE_ENV === "development") {
-  if (!global._mongoClient) {
-    global._mongoClient = new MongoClient(uri);
-    global._mongoClientPromise = global._mongoClient.connect();
-  }
-  client = global._mongoClient;
-  clientPromise = global._mongoClientPromise!;
-} else {
-  client = new MongoClient(uri);
-  clientPromise = client.connect();
-}
-
 function getDb() {
-  const activeClient = client || global._mongoClient;
-  if (activeClient) {
-    return activeClient.db();
+  const uri = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
+  if (!uri) {
+    throw new Error("MongoDB connection URI is missing from environment variables (MONGODB_URI or DATABASE_URL).");
   }
-  const fallbackClient = new MongoClient(uri);
-  return fallbackClient.db();
+
+  if (process.env.NODE_ENV === "development") {
+    if (!global._mongoClient) {
+      global._mongoClient = new MongoClient(uri);
+      global._mongoClientPromise = global._mongoClient.connect();
+    }
+    return global._mongoClient.db();
+  }
+
+  if (!client) {
+    client = new MongoClient(uri);
+    clientPromise = client.connect();
+  }
+  return client.db();
 }
 
 function toObjectId(id: string | ObjectId): ObjectId {
