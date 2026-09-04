@@ -52,7 +52,7 @@ export async function GET() {
         id: b.id,
         title: b.batchName ? `${b.package?.title || "Group Trip"} (${b.batchName})` : (b.package?.title || "Group Trip"),
         slug: b.package?.slug || "trip",
-        destinationName: b.package?.destination?.name || "India",
+        destinationName: b.package?.destination?.name || b.arrivalDestination || undefined,
         startDate: b.startDate,
         endDate: b.endDate,
         price: b.priceOverride || b.package?.sellingPrice || b.package?.startingPrice || b.package?.price || 0,

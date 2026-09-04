@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { formatDate, formatPrice } from "@/lib/utils";
+import { formatDate, formatPrice, getHeroImage } from "@/lib/utils";
 import {
   Plus,
   Trash2,
@@ -411,7 +411,7 @@ export function HeroSlidesClientManager({
             const subtitle = isEvent
               ? (slide.subtitle || (linkedEv ? `${formatDate(linkedEv.startDate)} – ${formatDate(linkedEv.endDate)} • ${linkedEv.duration}` : ""))
               : slide.subtitle;
-            const img = isEvent ? (slide.imageUrl || linkedEv?.coverImage || "") : (slide.imageUrl || "");
+            const img = getHeroImage(slide) || getHeroImage(linkedEv) || "";
             const offerPrice = isEvent ? (linkedEv?.offerPrice || slide.startingPrice) : slide.startingPrice;
             const realPrice = isEvent ? (linkedEv?.realPrice || slide.realPrice) : slide.realPrice;
 
@@ -627,7 +627,11 @@ export function HeroSlidesClientManager({
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-10 h-10 rounded-lg bg-gray-200 relative overflow-hidden shrink-0">
-                                {ev.coverImage && <Image src={ev.coverImage} alt={ev.packageTitle} fill className="object-cover" />}
+                                {getHeroImage(ev) ? (
+                                  <Image src={getHeroImage(ev)!} alt={ev.packageTitle} fill className="object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-[9px] text-gray-400 font-bold">No Image</div>
+                                )}
                               </div>
                               <div className="min-w-0">
                                 <h4 className="font-extrabold text-xs text-[#0B1026] truncate">{ev.packageTitle}</h4>

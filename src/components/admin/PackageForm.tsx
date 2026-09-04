@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createPackage, updatePackage } from "@/actions";
+import { generateSlug } from "@/lib/utils";
 import { Plus, Trash2, Save, ArrowLeft, RefreshCw, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { PackageCoverUploader } from "./PackageCoverUploader";
@@ -42,6 +43,7 @@ export interface PackageInitialData {
 
 interface FormErrors {
   title?: string;
+  slug?: string;
   destinationId?: string;
   days?: string;
   nights?: string;
@@ -73,7 +75,43 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
 
   // Basic Form States
   const [title, setTitle] = useState(initialData?.title || "");
+  const [slug, setSlug] = useState(initialData?.slug || (initialData?.title ? generateSlug(initialData.title) : ""));
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState<boolean>(Boolean(initialData?.slug));
+  const [origin, setOrigin] = useState<string>("");
   const [destinationId, setDestinationId] = useState(initialData?.destinationId || destinations[0]?.id || "");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+  }, []);
+
+  const handleTitleChange = (newTitle: string) => {
+    setTitle(newTitle);
+    if (!slugManuallyEdited) {
+      setSlug(generateSlug(newTitle));
+    }
+    if (fieldErrors.title) {
+      setFieldErrors((prev) => ({ ...prev, title: undefined }));
+    }
+  };
+
+  const handleSlugChange = (newSlug: string) => {
+    setSlug(newSlug);
+    setSlugManuallyEdited(true);
+    if (fieldErrors.slug) {
+      setFieldErrors((prev) => ({ ...prev, slug: undefined }));
+    }
+  };
+
+  const handleRegenerateSlug = () => {
+    const regenerated = generateSlug(title);
+    setSlug(regenerated);
+    setSlugManuallyEdited(false);
+    if (fieldErrors.slug) {
+      setFieldErrors((prev) => ({ ...prev, slug: undefined }));
+    }
+  };
 
   // Duration State (Days & Nights)
   const initialDuration = parseDurationString(initialData?.duration);
@@ -147,6 +185,11 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       errors.title = "Package title is required.";
     }
 
+    const currentSlug = generateSlug(slug || title);
+    if (!currentSlug) {
+      errors.slug = "Package slug is required.";
+    }
+
     if (!destinationId) {
       errors.destinationId = "Please select a destination.";
     }
@@ -182,11 +225,11 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
 
     const data = {
       title: title.trim(),
-      slug: initialData?.slug || undefined, // Server Actions auto-generate unique slug if undefined
+      slug: generateSlug(slug || title),
       shortDescription: formData.get("shortDescription") as string,
       fullDescription: formData.get("fullDescription") as string,
       destinationId,
-      tripType: "Group Departure", // Preserved as neutral default for legacy schema compatibility
+      tripType: (formData.get("tripType") as string) || "Group Departure",
       coverImage: coverImage.trim(),
       duration: generatedDuration,
       price: Number(formData.get("price")),
@@ -296,20 +339,18 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       )}
 
       {/* 1. Basic Package Information */}
-      <div className="bg-white rounded-3xl p-6 border border-[#E8ECF3] shadow-sm space-y-4">
+      <div className="bg-white rounded-3xl p-6 border border-[#E8ECF3] shadow-sm space-y-5">
         <h3 className="font-extrabold text-base text-[#0B1026]">1. Basic Package Information</h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="sm:col-span-2 space-y-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Package Title */}
+          <div className="space-y-1">
             <label className="block text-xs font-bold text-[#0B1026] mb-1">Package Title *</label>
             <input
               type="text"
               value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                if (fieldErrors.title) setFieldErrors((prev) => ({ ...prev, title: undefined }));
-              }}
-              placeholder="e.g. Kerala to Meghalaya Group Package"
+              onChange={(e) => handleTitleChange(e.target.value)}
+              placeholder="e.g. Kashmir Group Departure 2026"
               className={`w-full bg-[#F3F7FF] border rounded-xl px-3.5 py-2.5 text-xs font-bold transition-colors outline-none min-h-[44px] ${
                 fieldErrors.title
                   ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-500/20"
@@ -322,6 +363,76 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
                 <span>{fieldErrors.title}</span>
               </p>
             )}
+          </div>
+
+          {/* Slug */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-[#0B1026]">Slug *</label>
+              <button
+                type="button"
+                onClick={handleRegenerateSlug}
+                className="text-[11px] font-bold text-[#3478F6] hover:text-[#2563EB] flex items-center gap-1 transition-colors cursor-pointer"
+                title="Regenerate slug from current title"
+              >
+                <RefreshCw className="w-3 h-3" />
+                <span>Regenerate</span>
+              </button>
+            </div>
+            <input
+              type="text"
+              value={slug}
+              onChange={(e) => handleSlugChange(e.target.value)}
+              placeholder="e.g. kashmir-group-departure-2026"
+              className={`w-full bg-[#F3F7FF] border rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold transition-colors outline-none min-h-[44px] ${
+                fieldErrors.slug
+                  ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-500/20"
+                  : "border-[#E8ECF3] text-[#0B1026] focus:border-[#3478F6]"
+              }`}
+            />
+            {fieldErrors.slug && (
+              <p role="alert" className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{fieldErrors.slug}</span>
+              </p>
+            )}
+            <p className="text-[11px] text-gray-500 mt-1 break-all flex flex-wrap items-center gap-1">
+              <span className="font-semibold text-gray-400">Public URL:</span>
+              <span className="font-mono text-[#3478F6] underline decoration-blue-200">
+                {origin ? `${origin}/packages/${slug || "package-slug"}` : `/packages/${slug || "package-slug"}`}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Row 2: Destination, Category/Package Type, Status */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <DestinationSearchSelector
+            destinations={destinations}
+            value={destinationId}
+            onChange={(id) => {
+              setDestinationId(id);
+              if (fieldErrors.destinationId) {
+                setFieldErrors((prev) => ({ ...prev, destinationId: undefined }));
+              }
+            }}
+            error={fieldErrors.destinationId}
+          />
+
+          <div>
+            <label className="block text-xs font-bold text-[#0B1026] mb-1">Package Type / Category</label>
+            <select
+              name="tripType"
+              defaultValue={initialData?.tripType || "Group Departure"}
+              className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#0B1026] focus:outline-none focus:border-[#3478F6] min-h-[44px]"
+            >
+              <option value="Group Departure">Group Departure</option>
+              <option value="Custom Tour">Custom Tour</option>
+              <option value="Family Package">Family Package</option>
+              <option value="Honeymoon Package">Honeymoon Package</option>
+              <option value="Weekend Getaway">Weekend Getaway</option>
+              <option value="Solo Trip">Solo Trip</option>
+            </select>
           </div>
 
           <div>
@@ -340,18 +451,28 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
           </div>
         </div>
 
-        {/* Searchable Destination Selector */}
-        <DestinationSearchSelector
-          destinations={destinations}
-          value={destinationId}
-          onChange={(id) => {
-            setDestinationId(id);
-            if (fieldErrors.destinationId) {
-              setFieldErrors((prev) => ({ ...prev, destinationId: undefined }));
-            }
-          }}
-          error={fieldErrors.destinationId}
-        />
+        {/* Featured and Popular Toggles */}
+        <div className="flex flex-wrap items-center gap-6 pt-1">
+          <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[#0B1026]">
+            <input
+              type="checkbox"
+              name="featured"
+              defaultChecked={initialData?.featured}
+              className="w-4 h-4 rounded text-[#3478F6] focus:ring-[#3478F6]"
+            />
+            <span>Featured Package (Highlight on homepage)</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[#0B1026]">
+            <input
+              type="checkbox"
+              name="popular"
+              defaultChecked={initialData?.popular}
+              className="w-4 h-4 rounded text-[#3478F6] focus:ring-[#3478F6]"
+            />
+            <span>Popular Choice Badge</span>
+          </label>
+        </div>
 
         <div>
           <label className="block text-xs font-bold text-[#0B1026] mb-1">Short Description *</label>

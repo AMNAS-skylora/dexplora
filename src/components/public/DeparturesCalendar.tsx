@@ -128,8 +128,16 @@ export function DeparturesCalendar({ batches = [], customEvents = [] }: Departur
   const mergedItems = useMemo<MergedCalendarItem[]>(() => {
     const items: MergedCalendarItem[] = [];
 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     (batches || []).forEach((b) => {
       const sDate = parseLocalDate(b.startDate);
+      const sDateStart = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate());
+      if (sDateStart.getTime() < todayStart.getTime()) {
+        return; // Filter out expired/past batch dates
+      }
+
       const eDate = parseLocalDate(b.endDate);
       const total = b.totalSeats || 30;
       const avail = b.availableSeats !== undefined ? b.availableSeats : 30;
@@ -153,7 +161,7 @@ export function DeparturesCalendar({ batches = [], customEvents = [] }: Departur
         price: b.priceOverride || b.package?.price,
         totalSeats: total,
         availableSeats: avail,
-        destinationName: b.package?.destination?.name || "India",
+        destinationName: b.package?.destination?.name || (b as any).destinationName || (b as any).destination?.name || undefined,
         duration: b.package?.duration || "Multi-day",
         packageSlug: b.package?.slug || "trip",
         tripBatchId: b.id,
@@ -163,6 +171,11 @@ export function DeparturesCalendar({ batches = [], customEvents = [] }: Departur
 
     (customEvents || []).forEach((ev) => {
       const sDate = parseLocalDate(ev.startDate);
+      const sDateStart = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate());
+      if (sDateStart.getTime() < todayStart.getTime()) {
+        return; // Filter out expired/past custom events
+      }
+
       const eDate = parseLocalDate(ev.endDate);
 
       items.push({
@@ -401,15 +414,15 @@ export function DeparturesCalendar({ batches = [], customEvents = [] }: Departur
               {/* Premium Speech Bubble / Comic Callout */}
               {isCalloutActive && (
                 <div
-                  className={`absolute z-50 bg-[#111827] text-white text-[11px] sm:text-[12px] font-semibold px-2.5 py-1 rounded-[10px] shadow-[0_6px_18px_rgba(15,23,42,0.22)] whitespace-nowrap pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95 max-w-[min(160px,calc(100vw-32px))] truncate ${
+                  className={`absolute z-50 bg-[#111827] text-white text-[11px] sm:text-[12px] font-semibold px-2.5 py-1.5 rounded-[10px] shadow-[0_6px_18px_rgba(15,23,42,0.22)] whitespace-normal break-words pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95 w-max max-w-[min(240px,calc(100vw-32px))] text-center leading-tight ${
                     isTopRow ? "top-full mt-2" : "bottom-full mb-2"
                   } ${
                     isRightEdge ? "right-0" : isLeftEdge ? "left-0" : "left-1/2 -translate-x-1/2"
                   }`}
                 >
-                  <span className="truncate">{calloutLabel}</span>
+                  <span>{calloutLabel}</span>
                   {dayEvents.length > 1 && (
-                    <span className="ml-1 text-[#3478F6] font-bold">+{dayEvents.length - 1}</span>
+                    <span className="ml-1 text-[#3478F6] font-bold shrink-0">+{dayEvents.length - 1}</span>
                   )}
 
                   {/* Speech Bubble Pointer Arrow */}

@@ -29,13 +29,18 @@ export function generateBookingRef(): string {
   return `DEX-${year}-${randomNum}`;
 }
 
-export function slugify(text: string): string {
-  return text
+export function generateSlug(value: string): string {
+  if (!value) return "";
+  return value
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+export function slugify(text: string): string {
+  return generateSlug(text);
 }
 
 export function normalizeWhatsAppNumber(rawNumber?: string | null): string {
@@ -59,3 +64,33 @@ export function getWhatsAppLink(rawNumber?: string | null, customText?: string):
   }
   return baseUrl;
 }
+
+export function getHeroImage(item: any): string | null {
+  if (!item) return null;
+  return (
+    item.imageUrl ||
+    item.image ||
+    item.desktopImage ||
+    item.coverImage ||
+    item.heroImage ||
+    item.featuredImage ||
+    item.bannerImage ||
+    item.thumbnail ||
+    item.event?.coverImage ||
+    item.event?.imageUrl ||
+    item.event?.image ||
+    item.event?.heroImage ||
+    item.event?.package?.coverImage ||
+    item.event?.package?.imageUrl ||
+    item.event?.package?.image ||
+    item.package?.coverImage ||
+    item.package?.imageUrl ||
+    item.package?.image ||
+    item.gallery?.[0]?.url ||
+    item.images?.[0]?.url ||
+    (typeof item.gallery?.[0] === "string" ? item.gallery[0] : null) ||
+    (typeof item.images?.[0] === "string" ? item.images[0] : null) ||
+    null
+  );
+}
+

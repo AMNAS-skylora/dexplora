@@ -127,48 +127,78 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
   }
 
   // Fetch related packages (same destination or general featured)
-  const relatedPackages = await db.package.findMany({
-    where: {
-      id: { not: pkg.id },
-      status: "PUBLISHED",
-    },
-    take: 3,
-    orderBy: { createdAt: "desc" },
-    include: {
-      destination: { select: { name: true } },
-      batches: {
-        where: { startDate: { gte: new Date() } },
-        orderBy: { startDate: "asc" },
-        take: 1,
+  let relatedPackages: any[] = [];
+  try {
+    const rawRelated = await db.package.findMany({
+      where: {
+        id: { not: pkg.id },
+        status: "PUBLISHED",
       },
-    },
-  });
+      take: 3,
+      orderBy: { createdAt: "desc" },
+      include: {
+        destination: { select: { name: true } },
+        batches: {
+          where: { startDate: { gte: new Date() } },
+          orderBy: { startDate: "asc" },
+          take: 1,
+        },
+      },
+    });
+    relatedPackages = Array.isArray(rawRelated) ? rawRelated : [];
+  } catch (err) {
+    console.error("Error fetching related packages:", err);
+  }
 
-  const nextBatch = pkg.batches.length > 0 ? pkg.batches[0] : null;
-  const cleanWhatsapp = settings.whatsapp_number.replace(/\D/g, "");
-  const whatsappUrl = `https://wa.me/${cleanWhatsapp}?text=Hi%20Dexplora,%20I%20want%20information%20about%20the%20${encodeURIComponent(
-    pkg.title
-  )}%20trip`;
+  // Normalize optional array-based package fields
+  const batches = Array.isArray(pkg.batches) ? pkg.batches : [];
+  const gallery = Array.isArray(pkg.images)
+    ? pkg.images
+    : Array.isArray(pkg.gallery)
+    ? pkg.gallery
+    : [];
+  const itinerary = Array.isArray(pkg.itineraries)
+    ? pkg.itineraries
+    : Array.isArray(pkg.itinerary)
+    ? pkg.itinerary
+    : [];
+  const inclusions = Array.isArray(pkg.inclusions) ? pkg.inclusions : [];
+  const exclusions = Array.isArray(pkg.exclusions) ? pkg.exclusions : [];
+  const faqs = Array.isArray(pkg.faqs) ? pkg.faqs : [];
+
+  const nextBatch = batches.length > 0 ? (batches[0] ?? null) : null;
+
+  // Safe WhatsApp & Phone handling
+  const cleanWhatsapp = (settings?.whatsapp_number ?? "").replace(/\D/g, "");
+  const whatsappUrl = cleanWhatsapp
+    ? `https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(
+        `Hi Dexplora, I want information about the ${pkg.title || "package"} trip`
+      )}`
+    : null;
+
+  const cleanPhone = (settings?.phone_1 ?? "").replace(/\s+/g, "");
 
   const packageUrl = absoluteUrl(`/packages/${pkg.slug}`);
-  const imageUrl = pkg.coverImage.startsWith("http") ? pkg.coverImage : absoluteUrl(pkg.coverImage);
+  const coverImg = pkg.coverImage || "/images/logo/logoblack.png";
+  const imageUrl = coverImg.startsWith("http") ? coverImg : absoluteUrl(coverImg);
+  const destinationName = pkg.destination?.name || "India";
 
   const touristTripSchema = {
     "@context": "https://schema.org",
     "@type": "TouristTrip",
-    "name": pkg.title,
-    "description": pkg.shortDescription || pkg.fullDescription,
+    "name": pkg.title ?? "",
+    "description": pkg.shortDescription || pkg.fullDescription || "",
     "image": imageUrl,
     "url": packageUrl,
     "touristType": [pkg.tripType || "Group Departure"],
     "offers": {
       "@type": "Offer",
-      "price": pkg.price.toString(),
+      "price": (pkg.price ?? 0).toString(),
       "priceCurrency": "INR",
       "availability": nextBatch && nextBatch.availableSeats > 0 ? "https://schema.org/InStock" : "https://schema.org/LimitedAvailability",
       "url": packageUrl,
     },
-    "itinerary": pkg.itineraries.map((it: { dayNumber: number; title: string; description: string }) => ({
+    "itinerary": itinerary.map((it: { dayNumber: number; title: string; description: string }) => ({
       "@type": "ItemList",
       "name": `Day ${it.dayNumber}: ${it.title}`,
       "description": it.description,
@@ -194,7 +224,7 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
       {
         "@type": "ListItem",
         "position": 3,
-        "name": pkg.title,
+        "name": pkg.title ?? "",
         "item": packageUrl,
       },
     ],
@@ -214,7 +244,7 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
           Packages
         </Link>
         <ChevronRight className="w-3.5 h-3.5 text-[#94A3B8] shrink-0" />
-        <span className="text-[#3478F6] font-semibold truncate shrink-0">{pkg.destination.name}</span>
+        <span className="text-[#3478F6] font-semibold truncate shrink-0">{destinationName}</span>
       </nav>
 
       {/* 2. Main 2-Column Responsive Layout (Mobile Stack / Desktop 2-Column with Sticky Sidebar) */}
@@ -224,8 +254,8 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
           {/* Hero Image Container */}
           <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9] rounded-[18px] overflow-hidden bg-gray-100 border border-[#E5EAF2] shadow-xs">
             <Image
-              src={pkg.coverImage}
-              alt={pkg.title}
+              src={coverImg}
+              alt={pkg.title ?? "Package"}
               fill
               priority
               sizes="(max-width: 768px) 100vw, (max-width: 1024px) 70vw, 800px"
@@ -241,7 +271,7 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
               </span>
               <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-[11px] font-semibold rounded-full border border-white/30 flex items-center gap-1">
                 <MapPin className="w-3 h-3 text-white" />
-                {pkg.destination.name}
+                {destinationName}
               </span>
             </div>
           </div>
@@ -262,12 +292,14 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
             <div className="flex flex-wrap gap-2 pt-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F6F8FC] border border-[#E5EAF2] text-xs font-semibold text-[#0B1026]">
                 <MapPin className="w-3.5 h-3.5 text-[#3478F6]" />
-                <span>{pkg.destination.name}</span>
+                <span>{destinationName}</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F6F8FC] border border-[#E5EAF2] text-xs font-semibold text-[#0B1026]">
-                <Clock className="w-3.5 h-3.5 text-[#3478F6]" />
-                <span>{pkg.duration}</span>
-              </div>
+              {pkg.duration && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F6F8FC] border border-[#E5EAF2] text-xs font-semibold text-[#0B1026]">
+                  <Clock className="w-3.5 h-3.5 text-[#3478F6]" />
+                  <span>{pkg.duration}</span>
+                </div>
+              )}
               {pkg.departureLocation && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F6F8FC] border border-[#E5EAF2] text-xs font-semibold text-[#0B1026]">
                   <Bus className="w-3.5 h-3.5 text-[#3478F6]" />
@@ -284,7 +316,7 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#64748B] block">Starting From</span>
                 <div className="flex items-baseline gap-1.5 mt-0.5">
                   <span className="text-[clamp(27px,7vw,36px)] font-bold text-[#3478F6] leading-none">
-                    {formatPrice(pkg.price)}
+                    {formatPrice(pkg.price ?? 0)}
                   </span>
                   {pkg.originalPrice && (
                     <span className="text-xs text-[#94A3B8] line-through font-medium">
@@ -337,7 +369,7 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
             <div className="space-y-0.5">
               <Clock className="w-4 h-4 text-[#3478F6] mx-auto" />
               <span className="text-[11px] font-semibold text-[#64748B] block">Duration</span>
-              <span className="text-xs font-bold text-[#0B1026] block truncate">{pkg.duration}</span>
+              <span className="text-xs font-bold text-[#0B1026] block truncate">{pkg.duration || "N/A"}</span>
             </div>
             <div className="space-y-0.5">
               <Hotel className="w-4 h-4 text-[#3478F6] mx-auto" />
@@ -357,31 +389,33 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
           </div>
 
           {/* Overview */}
-          <div className="space-y-3 pt-2">
-            <h2 className="text-[clamp(20px,5vw,27px)] font-bold text-[#0B1026] leading-tight">
-              Trip Overview
-            </h2>
-            <p className="text-[clamp(14px,3.6vw,16px)] text-[#64748B] leading-[1.6] whitespace-pre-line break-words">
-              {pkg.fullDescription}
-            </p>
-          </div>
+          {pkg.fullDescription && (
+            <div className="space-y-3 pt-2">
+              <h2 className="text-[clamp(20px,5vw,27px)] font-bold text-[#0B1026] leading-tight">
+                Trip Overview
+              </h2>
+              <p className="text-[clamp(14px,3.6vw,16px)] text-[#64748B] leading-[1.6] whitespace-pre-line break-words">
+                {pkg.fullDescription}
+              </p>
+            </div>
+          )}
 
           {/* Day-by-Day Detailed Itinerary */}
-          {pkg.itineraries.length > 0 && (
+          {itinerary.length > 0 && (
             <div className="space-y-4 pt-2">
               <div className="flex items-center justify-between">
                 <h2 className="text-[clamp(20px,5vw,27px)] font-bold text-[#0B1026] leading-tight">
                   Detailed Itinerary
                 </h2>
                 <span className="text-xs text-[#3478F6] font-bold bg-[#3478F6]/10 px-2.5 py-1 rounded-full">
-                  {pkg.itineraries.length} Days Schedule
+                  {itinerary.length} Days Schedule
                 </span>
               </div>
 
               <div className="space-y-3">
-                {pkg.itineraries.map((it: { id: string; dayNumber: number; title: string; description: string; meals?: string | null; accommodation?: string | null }) => (
+                {itinerary.map((it: { id?: string; dayNumber: number; title: string; description: string; meals?: string | null; accommodation?: string | null }, idx: number) => (
                   <div
-                    key={it.id}
+                    key={it.id || `itin-${idx}`}
                     className="bg-white rounded-[16px] border border-[#E5EAF2] p-4.5 shadow-xs space-y-2.5"
                   >
                     <div className="flex items-center gap-3">
@@ -416,43 +450,45 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
           )}
 
           {/* Inclusions & Exclusions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            {/* Inclusions */}
-            {pkg.inclusions.length > 0 && (
-              <div className="bg-[#F0FDF4] rounded-[16px] p-4.5 border border-[#DCFCE7] space-y-3">
-                <div className="flex items-center gap-2 text-[#16A36A]">
-                  <CheckCircle2 className="w-4.5 h-4.5 shrink-0 stroke-[2.5]" />
-                  <h3 className="font-bold text-sm sm:text-base">What&apos;s Included</h3>
+          {(inclusions.length > 0 || exclusions.length > 0) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              {/* Inclusions */}
+              {inclusions.length > 0 && (
+                <div className="bg-[#F0FDF4] rounded-[16px] p-4.5 border border-[#DCFCE7] space-y-3">
+                  <div className="flex items-center gap-2 text-[#16A36A]">
+                    <CheckCircle2 className="w-4.5 h-4.5 shrink-0 stroke-[2.5]" />
+                    <h3 className="font-bold text-sm sm:text-base">What&apos;s Included</h3>
+                  </div>
+                  <ul className="space-y-2 text-xs text-[#1E293B] font-medium">
+                    {inclusions.map((inc: { id?: string; text: string }, idx: number) => (
+                      <li key={inc.id || `inc-${idx}`} className="flex items-start gap-2">
+                        <span className="text-[#16A36A] font-bold">✓</span>
+                        <span className="break-words">{inc.text}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="space-y-2 text-xs text-[#1E293B] font-medium">
-                  {pkg.inclusions.map((inc: { id: string; text: string }) => (
-                    <li key={inc.id} className="flex items-start gap-2">
-                      <span className="text-[#16A36A] font-bold">✓</span>
-                      <span className="break-words">{inc.text}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+              )}
 
-            {/* Exclusions */}
-            {pkg.exclusions.length > 0 && (
-              <div className="bg-[#FEF2F2] rounded-[16px] p-4.5 border border-[#FEE2E2] space-y-3">
-                <div className="flex items-center gap-2 text-[#DC2626]">
-                  <XCircle className="w-4.5 h-4.5 shrink-0 stroke-[2.5]" />
-                  <h3 className="font-bold text-sm sm:text-base">What&apos;s Not Included</h3>
+              {/* Exclusions */}
+              {exclusions.length > 0 && (
+                <div className="bg-[#FEF2F2] rounded-[16px] p-4.5 border border-[#FEE2E2] space-y-3">
+                  <div className="flex items-center gap-2 text-[#DC2626]">
+                    <XCircle className="w-4.5 h-4.5 shrink-0 stroke-[2.5]" />
+                    <h3 className="font-bold text-sm sm:text-base">What&apos;s Not Included</h3>
+                  </div>
+                  <ul className="space-y-2 text-xs text-[#1E293B] font-medium">
+                    {exclusions.map((exc: { id?: string; text: string }, idx: number) => (
+                      <li key={exc.id || `exc-${idx}`} className="flex items-start gap-2">
+                        <span className="text-[#DC2626] font-bold">✕</span>
+                        <span className="break-words">{exc.text}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="space-y-2 text-xs text-[#1E293B] font-medium">
-                  {pkg.exclusions.map((exc: { id: string; text: string }) => (
-                    <li key={exc.id} className="flex items-start gap-2">
-                      <span className="text-[#DC2626] font-bold">✕</span>
-                      <span className="break-words">{exc.text}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Boarding Points */}
           {pkg.departureLocation && (
@@ -472,13 +508,13 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
           )}
 
           {/* Upcoming Departure Dates Grid */}
-          {pkg.batches.length > 0 && (
+          {batches.length > 0 && (
             <div className="space-y-3 pt-2">
               <h2 className="text-[clamp(20px,5vw,27px)] font-bold text-[#0B1026] leading-tight">
                 Upcoming Departure Dates
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {pkg.batches.map((b: { id: string; batchName?: string | null; startDate: Date | string; endDate: Date | string; availableSeats: number; priceOverride?: number | null }) => (
+                {batches.map((b: { id: string; batchName?: string | null; startDate: Date | string; endDate: Date | string; availableSeats: number; priceOverride?: number | null }) => (
                   <div
                     key={b.id}
                     className="bg-white rounded-[16px] border border-[#E5EAF2] p-4 flex flex-col justify-between gap-3 shadow-xs"
@@ -497,7 +533,7 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
 
                     <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#F1F5F9]">
                       <span className="text-sm font-bold text-[#3478F6]">
-                        {formatPrice(b.priceOverride || pkg.price)}
+                        {formatPrice(b.priceOverride || pkg.price || 0)}
                       </span>
                       <Link
                         href={`/book-now?packageId=${pkg.slug}&batchId=${b.id}`}
@@ -513,20 +549,20 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
           )}
 
           {/* Package Gallery Photos */}
-          {pkg.images.length > 0 && (
+          {gallery.length > 0 && (
             <div className="space-y-3 pt-2">
               <h2 className="text-[clamp(20px,5vw,27px)] font-bold text-[#0B1026] leading-tight">
                 Trip Photos
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {pkg.images.map((img: { id: string; url: string; caption?: string | null }) => (
+                {gallery.map((img: { id?: string; url: string; caption?: string | null }, idx: number) => (
                   <div
-                    key={img.id}
+                    key={img.id || `img-${idx}`}
                     className="relative aspect-square rounded-[14px] overflow-hidden bg-gray-100 border border-[#E5EAF2] shadow-xs"
                   >
                     <Image
                       src={img.url}
-                      alt={img.caption || pkg.title}
+                      alt={img.caption || pkg.title || "Photo"}
                       fill
                       sizes="(max-width: 640px) 50vw, 33vw"
                       className="object-cover hover:scale-105 transition-transform duration-300"
@@ -538,14 +574,14 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
           )}
 
           {/* FAQs */}
-          {pkg.faqs.length > 0 && (
+          {faqs.length > 0 && (
             <div className="space-y-3 pt-2 border-t border-[#E8ECF3]">
               <h2 className="text-[clamp(20px,5vw,27px)] font-bold text-[#0B1026] leading-tight">
                 Frequently Asked Questions
               </h2>
               <div className="space-y-2.5">
-                {pkg.faqs.map((faq: { id: string; question: string; answer: string }) => (
-                  <div key={faq.id} className="bg-[#F8FAFC] rounded-[14px] p-4 border border-[#E5EAF2] space-y-1">
+                {faqs.map((faq: { id?: string; question: string; answer: string }, idx: number) => (
+                  <div key={faq.id || `faq-${idx}`} className="bg-[#F8FAFC] rounded-[14px] p-4 border border-[#E5EAF2] space-y-1">
                     <h4 className="font-bold text-xs sm:text-sm text-[#0B1026] flex items-center gap-2">
                       <HelpCircle className="w-4 h-4 text-[#3478F6] shrink-0" />
                       <span>{faq.question}</span>
@@ -564,7 +600,7 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
             <div>
               <span className="text-xs text-[#64748B] font-bold uppercase tracking-wider block">Package Price</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-3xl font-extrabold text-[#3478F6]">{formatPrice(pkg.price)}</span>
+                <span className="text-3xl font-extrabold text-[#3478F6]">{formatPrice(pkg.price ?? 0)}</span>
                 {pkg.originalPrice && (
                   <span className="text-sm text-[#94A3B8] line-through font-medium">
                     {formatPrice(pkg.originalPrice)}
@@ -595,23 +631,27 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
                 <ArrowRight className="w-4 h-4" />
               </Link>
 
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full h-[44px] bg-[#16A36A] hover:bg-[#128856] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <Send className="w-4 h-4" />
-                <span>Enquire on WhatsApp</span>
-              </a>
+              {whatsappUrl && (
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-[44px] bg-[#16A36A] hover:bg-[#128856] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Enquire on WhatsApp</span>
+                </a>
+              )}
 
-              <a
-                href={`tel:${settings.phone_1.replace(/\s+/g, "")}`}
-                className="w-full h-[42px] bg-[#F6F8FC] border border-[#E5EAF2] text-[#0B1026] hover:bg-gray-100 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                <Phone className="w-3.5 h-3.5 text-[#3478F6]" />
-                <span>Call {settings.phone_1}</span>
-              </a>
+              {settings?.phone_1 && (
+                <a
+                  href={`tel:${cleanPhone}`}
+                  className="w-full h-[42px] bg-[#F6F8FC] border border-[#E5EAF2] text-[#0B1026] hover:bg-gray-100 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Phone className="w-3.5 h-3.5 text-[#3478F6]" />
+                  <span>Call {settings.phone_1}</span>
+                </a>
+              )}
             </div>
 
             <div className="pt-3 border-t border-[#F1F5F9] space-y-2 text-xs text-[#64748B]">
@@ -676,8 +716,8 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
         packageSlug={pkg.slug}
         packageTitle={pkg.title}
         price={pkg.price}
-        whatsappNumber={settings.whatsapp_number}
-        phoneNumber={settings.phone_1}
+        whatsappNumber={settings?.whatsapp_number}
+        phoneNumber={settings?.phone_1}
       />
     </div>
   );

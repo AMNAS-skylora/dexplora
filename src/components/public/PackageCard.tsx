@@ -61,10 +61,12 @@ export function PackageCard({
 
         {/* Compact Overlay Badges */}
         <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1 min-w-0">
-          <div className="flex items-center gap-1 bg-[#050A24]/80 border border-white/14 backdrop-blur-md px-2.5 h-[25px] rounded-[8px] text-[10px] sm:text-xs font-semibold text-white min-w-0 truncate">
-            <MapPin className="w-3 h-3 text-[#3478F6] shrink-0" />
-            <span className="truncate">{destination?.name || "India"}</span>
-          </div>
+          {destination?.name && (
+            <div className="flex items-center gap-1 bg-[#050A24]/80 border border-white/14 backdrop-blur-md px-2.5 h-[25px] rounded-[8px] text-[10px] sm:text-xs font-semibold text-white min-w-0 truncate">
+              <MapPin className="w-3 h-3 text-[#3478F6] shrink-0" />
+              <span className="truncate">{destination.name}</span>
+            </div>
+          )}
           <div className="flex items-center gap-1 bg-[#050A24]/80 border border-white/14 backdrop-blur-md px-2.5 h-[25px] rounded-[8px] text-[10px] sm:text-xs font-semibold text-white shrink-0">
             <Clock3 className="w-3 h-3 text-amber-400 shrink-0" />
             <span>{duration || "Multi-day"}</span>

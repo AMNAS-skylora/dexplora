@@ -104,48 +104,165 @@ function transformDoc(doc: any): any {
   return transformed;
 }
 
-function transformWhere(where: any): any {
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function transformFieldOperators(condition: any): any {
+  if (
+    condition === null ||
+    typeof condition !== "object" ||
+    Array.isArray(condition) ||
+    condition instanceof Date ||
+    condition instanceof ObjectId
+  ) {
+    return condition;
+  }
+
+  const result: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(condition)) {
+    switch (key) {
+      case "equals":
+        result.$eq = value;
+        break;
+
+      case "not":
+        if (
+          value !== null &&
+          typeof value === "object" &&
+          !Array.isArray(value) &&
+          !(value instanceof Date) &&
+          !(value instanceof ObjectId)
+        ) {
+          const nested = transformFieldOperators(value);
+          if (
+            nested !== null &&
+            typeof nested === "object" &&
+            !Array.isArray(nested)
+          ) {
+            result.$not = nested;
+          } else {
+            result.$ne = nested;
+          }
+        } else {
+          result.$ne = value;
+        }
+        break;
+
+      case "ne":
+        result.$ne = value;
+        break;
+
+      case "in":
+        result.$in = value;
+        break;
+
+      case "notIn":
+        result.$nin = value;
+        break;
+
+      case "lt":
+        result.$lt = value;
+        break;
+
+      case "lte":
+        result.$lte = value;
+        break;
+
+      case "gt":
+        result.$gt = value;
+        break;
+
+      case "gte":
+        result.$gte = value;
+        break;
+
+      case "contains":
+        result.$regex = escapeRegex(String(value));
+        break;
+
+      case "startsWith":
+        result.$regex = `^${escapeRegex(String(value))}`;
+        break;
+
+      case "endsWith":
+        result.$regex = `${escapeRegex(String(value))}$`;
+        break;
+
+      default:
+        result[key.startsWith("$") ? key : `$${key}`] = value;
+    }
+  }
+
+  return result;
+}
+
+export function transformWhere(where: any): any {
   if (!where) return {};
   const filter: any = {};
 
-  const knownOperators = ["gte", "lte", "gt", "lt", "in", "equals", "not", "ne"];
+  const knownOperators = [
+    "gte",
+    "lte",
+    "gt",
+    "lt",
+    "in",
+    "notIn",
+    "equals",
+    "not",
+    "ne",
+    "contains",
+    "startsWith",
+    "endsWith",
+  ];
 
   for (const [key, val] of Object.entries(where)) {
-    if (key === "id" && typeof val === "string") {
-      filter._id = toObjectId(val);
-    } else if (key === "id" && typeof val === "object" && val !== null) {
-      const cond: any = {};
-      for (const [op, opVal] of Object.entries(val as any)) {
-        if (op === "in" && Array.isArray(opVal)) {
-          cond["$in"] = opVal.map(toObjectId);
-        } else {
-          cond[`$${op}`] = opVal;
+    if (key === "id") {
+      if (typeof val === "string") {
+        filter._id = toObjectId(val);
+      } else if (val && typeof val === "object" && !(val instanceof ObjectId) && !(val instanceof Date)) {
+        const cond: any = {};
+        for (const [op, opVal] of Object.entries(val as any)) {
+          if (op === "in" && Array.isArray(opVal)) {
+            cond["$in"] = opVal.map(toObjectId);
+          } else if (op === "notIn" && Array.isArray(opVal)) {
+            cond["$nin"] = opVal.map(toObjectId);
+          } else if (op === "not" || op === "ne") {
+            if (opVal !== null && typeof opVal === "object" && !Array.isArray(opVal)) {
+              cond["$not"] = opVal;
+            } else {
+              cond["$ne"] = typeof opVal === "string" ? toObjectId(opVal) : opVal;
+            }
+          } else if (op === "equals") {
+            cond["$eq"] = typeof opVal === "string" ? toObjectId(opVal) : opVal;
+          } else {
+            cond[op.startsWith("$") ? op : `$${op}`] = opVal;
+          }
         }
+        filter._id = cond;
+      } else {
+        filter._id = val;
       }
-      filter._id = cond;
     } else if (key === "OR" && Array.isArray(val)) {
       filter["$or"] = val.map(transformWhere);
     } else if (key === "AND" && Array.isArray(val)) {
       filter["$and"] = val.map(transformWhere);
+    } else if (key === "NOT") {
+      if (Array.isArray(val)) {
+        filter["$nor"] = val.map(transformWhere);
+      } else if (val && typeof val === "object") {
+        filter["$nor"] = [transformWhere(val)];
+      }
     } else if (typeof val === "object" && val !== null && !(val instanceof Date) && !(val instanceof ObjectId)) {
       const keys = Object.keys(val as any);
-      const isOperatorFilter = keys.length > 0 && keys.every((k) => knownOperators.includes(k));
+      const isOperatorFilter = keys.length > 0 && keys.every((k) => knownOperators.includes(k) || k.startsWith("$"));
 
       if (isOperatorFilter) {
-        const cond: any = {};
-        for (const [op, opVal] of Object.entries(val as any)) {
-          if (op === "gte") cond["$gte"] = opVal;
-          else if (op === "lte") cond["$lte"] = opVal;
-          else if (op === "gt") cond["$gt"] = opVal;
-          else if (op === "lt") cond["$lt"] = opVal;
-          else if (op === "in" && Array.isArray(opVal)) cond["$in"] = opVal;
-          else if (op === "ne" || op === "not") cond["$ne"] = opVal;
-          else cond[`$${op}`] = opVal;
-        }
-        filter[key] = cond;
+        filter[key] = transformFieldOperators(val);
       } else {
         for (const [subKey, subVal] of Object.entries(val as any)) {
-          if (subVal && typeof subVal === "object" && !(subVal instanceof Date)) {
+          if (subVal && typeof subVal === "object" && !(subVal instanceof Date) && !(subVal instanceof ObjectId)) {
             const subFilter = transformWhere({ [subKey]: subVal });
             for (const [fKey, fVal] of Object.entries(subFilter)) {
               filter[`${key}.${fKey}`] = fVal;
@@ -183,20 +300,20 @@ function transformOrderBy(orderBy: any): any {
 }
 
 async function populatePackageRelations(docs: any, include: any) {
-  if (!docs || !include) return docs;
+  if (!docs) return docs;
   const isArray = Array.isArray(docs);
   const items = isArray ? docs : [docs];
 
-  if (include.destination) {
+  if (include?.destination) {
     const destIds = items
-      .map((i) => i.destinationId)
+      .map((i) => i?.destinationId)
       .filter((id) => Boolean(id) && typeof id === "string" && ObjectId.isValid(id));
     if (destIds.length > 0) {
       const objectIds = destIds.map((id: string) => toObjectId(id));
       const destDocs = await getDb().collection("Destination").find({ _id: { $in: objectIds } }).toArray();
       const destMap = new Map(destDocs.map((d: any) => [d._id.toString(), transformDoc(d)]));
       items.forEach((item: any) => {
-        if (item.destinationId) {
+        if (item?.destinationId) {
           const matched = destMap.get(item.destinationId.toString());
           if (matched) {
             item.destination = matched;
@@ -206,24 +323,35 @@ async function populatePackageRelations(docs: any, include: any) {
     }
   }
 
-  if (include.batches) {
-    const pkgIds = items.map((i) => i.id).filter(Boolean);
+  if (include?.batches) {
+    const pkgIds = items.map((i) => i?.id).filter(Boolean);
+    const batchesMap = new Map<string, any[]>();
     if (pkgIds.length > 0) {
       const batchDocs = await getDb().collection("TripBatch").find({ packageId: { $in: pkgIds } }).toArray();
-      const batchesMap = new Map<string, any[]>();
       batchDocs.forEach((b: any) => {
         const transformed = transformDoc(b);
         const pId = b.packageId;
         if (!batchesMap.has(pId)) batchesMap.set(pId, []);
         batchesMap.get(pId)!.push(transformed);
       });
-      items.forEach((item: any) => {
-        if (batchesMap.has(item.id)) {
-          item.batches = batchesMap.get(item.id);
-        }
-      });
     }
+    items.forEach((item: any) => {
+      if (item) {
+        item.batches = batchesMap.get(item.id) || (Array.isArray(item.batches) ? item.batches : []);
+      }
+    });
   }
+
+  // Guarantee all array fields on Package objects are arrays
+  items.forEach((item: any) => {
+    if (!item) return;
+    if (!Array.isArray(item.batches)) item.batches = [];
+    if (!Array.isArray(item.images)) item.images = Array.isArray(item.gallery) ? item.gallery : [];
+    if (!Array.isArray(item.itineraries)) item.itineraries = Array.isArray(item.itinerary) ? item.itinerary : [];
+    if (!Array.isArray(item.inclusions)) item.inclusions = [];
+    if (!Array.isArray(item.exclusions)) item.exclusions = [];
+    if (!Array.isArray(item.faqs)) item.faqs = [];
+  });
 
   return isArray ? items : items[0];
 }
@@ -313,7 +441,24 @@ async function populateHeroSlideRelations(docs: any) {
 
     items.forEach((item: any) => {
       if (item.eventId) {
-        item.event = batchMap.get(item.eventId) || null;
+        const ev = batchMap.get(item.eventId) || null;
+        if (ev) {
+          const resolvedEvImage =
+            ev.coverImage ||
+            ev.imageUrl ||
+            ev.image ||
+            ev.package?.coverImage ||
+            ev.package?.imageUrl ||
+            ev.package?.image ||
+            null;
+          item.event = {
+            ...ev,
+            coverImage: resolvedEvImage,
+            image: resolvedEvImage,
+          };
+        } else {
+          item.event = null;
+        }
       }
     });
   }

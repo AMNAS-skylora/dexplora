@@ -3,18 +3,28 @@
 import { useEffect, useState } from "react";
 
 interface HeroWordRevealProps {
-  text: string;
+  text?: string | null;
   className?: string;
   wordDelay?: number; // 50ms-80ms
 }
 
-export function HeroWordReveal({ text, className = "", wordDelay = 65 }: HeroWordRevealProps) {
+export function HeroWordReveal({
+  text,
+  className = "",
+  wordDelay = 65,
+}: HeroWordRevealProps) {
   const [mounted, setMounted] = useState(false);
-  const words = text.split(" ");
+
+  const safeText = typeof text === "string" ? text.trim() : "";
+  const words = safeText ? safeText.split(/\s+/) : [];
 
   useEffect(() => {
     requestAnimationFrame(() => setMounted(true));
   }, []);
+
+  if (!safeText || words.length === 0) {
+    return null;
+  }
 
   return (
     <span className={`inline-block ${className}`}>

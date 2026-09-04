@@ -5,7 +5,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Pagination, Navigation } from "swiper/modules";
 import Image from "next/image";
 import Link from "next/link";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, getHeroImage } from "@/lib/utils";
 import { ArrowRight, MapPin } from "lucide-react";
 import { HeroWordReveal } from "@/components/animation/HeroWordReveal";
 
@@ -25,6 +25,8 @@ interface SlideData {
   primaryBtnUrl?: string | null;
   secondaryBtnText?: string | null;
   secondaryBtnUrl?: string | null;
+  event?: any;
+  package?: any;
 }
 
 interface HeroSliderProps {
@@ -91,10 +93,14 @@ export function HeroSlider({ slides, whatsappNumber = "917034267985" }: HeroSlid
         className="w-full h-[460px] sm:h-[540px] md:h-[600px] lg:h-[640px]"
       >
         {slides.map((slide, index) => {
-          const bgImage = slide.imageUrl || slide.desktopImage || "";
+          const title = typeof slide.title === "string" ? slide.title.trim() : "";
+          const subtitle = typeof slide.subtitle === "string" ? slide.subtitle.trim() : "";
+          const bgImage = getHeroImage(slide) || "";
           const whatsappUrl = slide.secondaryBtnUrl && slide.secondaryBtnUrl.includes("wa.me")
             ? slide.secondaryBtnUrl
-            : `https://wa.me/${cleanWhatsapp}?text=Hi%20Dexplora,%20I%20am%20interested%20in%20the%20${encodeURIComponent(slide.title)}`;
+            : (cleanWhatsapp
+                ? `https://wa.me/${cleanWhatsapp}?text=Hi%20Dexplora,%20I%20am%20interested%20in%20the%20${encodeURIComponent(title || "tour")}`
+                : "#");
           const hasImageError = imageErrors[slide.id] || !bgImage;
 
           return (
@@ -108,7 +114,7 @@ export function HeroSlider({ slides, whatsappNumber = "917034267985" }: HeroSlid
                     )}
                     <Image
                       src={bgImage}
-                      alt={slide.title}
+                      alt={title || "Hero slide"}
                       fill
                       sizes="100vw"
                       priority={index === 0}
@@ -138,20 +144,22 @@ export function HeroSlider({ slides, whatsappNumber = "917034267985" }: HeroSlid
               <div className="relative z-10 max-w-7xl mx-auto h-full flex flex-col justify-end p-4 sm:p-6 lg:p-8 pb-8 text-white">
                 <div className="w-full max-w-xl flex flex-col gap-2.5 sm:gap-3.5 min-w-0">
                   {/* Responsive Title */}
-                  <h1 className="text-white drop-shadow-md hero-title">
-                    <HeroWordReveal text={slide.title} />
-                  </h1>
+                  {title ? (
+                    <h1 className="text-white drop-shadow-md hero-title">
+                      <HeroWordReveal text={title} />
+                    </h1>
+                  ) : null}
 
                   {/* Subtitle */}
-                  {slide.subtitle && (
+                  {subtitle ? (
                     <p className="text-white/90 font-medium line-clamp-2 hero-subtitle">
-                      {slide.subtitle}
+                      {subtitle}
                     </p>
-                  )}
+                  ) : null}
 
                   {/* Info Cards Grid */}
                   <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-1">
-                    {slide.startingPrice && (
+                    {slide.startingPrice ? (
                       <div className="bg-[#0A1228]/80 border border-white/15 backdrop-blur-md rounded-xl p-2.5 sm:p-3 min-h-[58px] flex flex-col justify-center min-w-0">
                         <span className="text-gray-300 font-semibold block uppercase tracking-wider info-label truncate">
                           Starting from
@@ -160,14 +168,14 @@ export function HeroSlider({ slides, whatsappNumber = "917034267985" }: HeroSlid
                           <span className="font-bold text-[#3478F6] leading-none mt-0.5 price-value truncate">
                             {formatPrice(slide.startingPrice)}
                           </span>
-                          {slide.realPrice && (
+                          {slide.realPrice ? (
                             <span className="text-gray-400 line-through font-semibold info-label truncate">
                               {formatPrice(slide.realPrice)}
                             </span>
-                          )}
+                          ) : null}
                         </div>
                       </div>
-                    )}
+                    ) : null}
 
                     <div className="bg-[#0A1228]/80 border border-white/15 backdrop-blur-md rounded-xl p-2.5 sm:p-3 min-h-[58px] flex items-center gap-2 min-w-0">
                       <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[#3478F6]/20 text-[#3478F6] flex items-center justify-center shrink-0">

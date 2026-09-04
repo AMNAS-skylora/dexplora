@@ -330,19 +330,35 @@ export interface GalleryImageInputData {
 }
 
 // Helper for unique slug generation
-async function generateUniqueSlug(baseTitle: string, currentId?: string): Promise<string> {
-  const baseSlug = slugify(baseTitle) || "tour-package";
+export async function checkPackageSlugExists(slug: string, currentPackageId?: string): Promise<boolean> {
+  const normalized = slugify(slug);
+  if (!normalized) return false;
+
+  const where: any = { slug: normalized };
+  if (currentPackageId) {
+    where.id = { ne: currentPackageId };
+  }
+  const existing = await db.package.findFirst({ where });
+  return Boolean(existing);
+}
+
+export async function generateUniquePackageSlug(baseTitleOrSlug: string, currentPackageId?: string): Promise<string> {
+  const baseSlug = slugify(baseTitleOrSlug) || "tour-package";
   let candidate = baseSlug;
   let count = 2;
 
-  while (true) {
-    const existing = await db.package.findFirst({ where: { slug: candidate } });
-    if (!existing || (currentId && existing.id === currentId)) {
-      return candidate;
-    }
+  while (await checkPackageSlugExists(candidate, currentPackageId)) {
     candidate = `${baseSlug}-${count}`;
     count++;
   }
+  return candidate;
+}
+
+export async function checkSlugAvailability(slug: string, currentPackageId?: string) {
+  const normalized = slugify(slug);
+  if (!normalized) return { available: false, error: "Slug cannot be empty" };
+  const inUse = await checkPackageSlugExists(normalized, currentPackageId);
+  return { available: !inUse, slug: normalized };
 }
 
 // ================= PACKAGE ACTIONS =================
@@ -351,9 +367,25 @@ export async function createPackage(data: PackageInputData) {
   if (!session) return { error: "Unauthorized" };
 
   try {
-    const packageSlug = data.slug
-      ? slugify(data.slug)
-      : await generateUniqueSlug(data.title);
+    const rawTitle = data.title?.trim() || "";
+    if (!rawTitle) {
+      return { error: "Package title is required." };
+    }
+
+    const normalizedSlug = slugify(data.slug || rawTitle);
+    if (!normalizedSlug) {
+      return { error: "Package slug is required." };
+    }
+
+    const slugInUse = await checkPackageSlugExists(normalizedSlug);
+    let packageSlug = normalizedSlug;
+    if (slugInUse) {
+      if (data.slug && data.slug.trim() !== "") {
+        return { error: "This slug is already being used by another package." };
+      } else {
+        packageSlug = await generateUniquePackageSlug(normalizedSlug);
+      }
+    }
 
     const newPkg = await db.package.create({
       data: {
@@ -371,7 +403,7 @@ export async function createPackage(data: PackageInputData) {
         arrivalLocation: data.arrivalLocation,
         accommodation: data.accommodation,
         transportation: data.transportation,
-        guideInfo: data.guideInfo,
+ guideInfo: data.guideInfo,
         meals: data.meals,
         featured: Boolean(data.featured),
         popular: Boolean(data.popular),
@@ -436,9 +468,19 @@ export async function updatePackage(id: string, data: PackageInputData) {
 
   try {
     const existingPkg = await db.package.findUnique({ where: { id } });
-    const packageSlug = data.slug
-      ? slugify(data.slug)
-      : existingPkg?.slug || (await generateUniqueSlug(data.title, id));
+    if (!existingPkg) return { error: "Package not found." };
+
+    const rawTitle = data.title?.trim() || existingPkg.title;
+    const normalizedSlug = slugify(data.slug || rawTitle);
+    if (!normalizedSlug) {
+      return { error: "Package slug is required." };
+    }
+
+    const slugInUse = await checkPackageSlugExists(normalizedSlug, id);
+    if (slugInUse) {
+      return { error: "This slug is already being used by another package." };
+    }
+    const packageSlug = normalizedSlug;
 
     // Clear old relations to replace with new ones
     await db.packageItinerary.deleteMany({ where: { packageId: id } });

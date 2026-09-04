@@ -81,7 +81,7 @@ export default async function UpcomingTripsPage() {
                   originalPrice={pkg.realPrice || pkg.originalPrice}
                   departureLocation={pkg.departureLocation || "Kochi / Kerala"}
                   tripType="UPCOMING DEPARTURE"
-                  destination={pkg.destination || { name: "India" }}
+                  destination={pkg.destination}
                   batches={[
                     {
                       startDate: b.startDate,
