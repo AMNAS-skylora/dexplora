@@ -9,7 +9,7 @@ import { Counter } from "@/components/animation/Counter";
 import type { Metadata } from "next";
 import { absoluteUrl } from "@/lib/seo";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "About Dexplora Tour Planners",

@@ -5,7 +5,7 @@ import { Star, Quote, CheckCircle2 } from "lucide-react";
 import type { Metadata } from "next";
 import { absoluteUrl } from "@/lib/seo";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Traveler Reviews & Feedback",

@@ -29,7 +29,7 @@ import type { Metadata } from "next";
 import { absoluteUrl } from "@/lib/seo";
 import { JsonLd } from "@/components/seo/JsonLd";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 interface PackageDetailPageProps {
   params: Promise<{ slug: string }>;

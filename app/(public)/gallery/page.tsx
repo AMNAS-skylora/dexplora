@@ -4,7 +4,7 @@ import { GalleryGrid } from "@/components/public/GalleryGrid";
 import type { Metadata } from "next";
 import { absoluteUrl } from "@/lib/seo";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Travel Gallery | Real Traveler Photos",

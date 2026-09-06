@@ -28,7 +28,7 @@ import {
 import type { Metadata } from "next";
 import { absoluteUrl } from "@/lib/seo";
 
-export const revalidate = 0; // Fresh database-driven event sync
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Budget Group Trips Across India",

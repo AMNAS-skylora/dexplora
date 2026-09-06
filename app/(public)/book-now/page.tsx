@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { getSiteSettings } from "@/lib/settings";
 import { BookingForm } from "@/components/public/BookingForm";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 interface BookNowPageProps {
   searchParams: Promise<{ packageId?: string; batchId?: string }>;
@@ -12,24 +12,29 @@ export default async function BookNowPage({ searchParams }: BookNowPageProps) {
   const params = await searchParams;
   const settings = await getSiteSettings();
 
-  const packages = await db.package.findMany({
-    where: { status: "PUBLISHED" },
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      batches: {
-        where: { startDate: { gte: new Date() } },
-        select: {
-          id: true,
-          batchName: true,
-          startDate: true,
-          endDate: true,
+  let packages: any[] = [];
+  try {
+    packages = await db.package.findMany({
+      where: { status: "PUBLISHED" },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        batches: {
+          where: { startDate: { gte: new Date() } },
+          select: {
+            id: true,
+            batchName: true,
+            startDate: true,
+            endDate: true,
+          },
         },
       },
-    },
-    orderBy: { displayOrder: "asc" },
-  });
+      orderBy: { displayOrder: "asc" },
+    });
+  } catch (error) {
+    console.error("Error fetching packages for booking form:", error);
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
