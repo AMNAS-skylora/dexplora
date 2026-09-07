@@ -487,11 +487,18 @@ async function populateGalleryImageRelations(docs: any, include: any) {
   return isArray ? items : items[0];
 }
 
+export function isDbAvailable(): boolean {
+  const rawUri = process.env.MONGODB_URI || process.env.DATABASE_URL;
+  const uri = rawUri?.trim();
+  return Boolean(uri && (uri.startsWith("mongodb://") || uri.startsWith("mongodb+srv://")));
+}
+
 function createCollectionWrapper(collectionName: string) {
   const getCol = () => getDb().collection(collectionName);
 
   return {
     async findMany(args: any = {}) {
+      if (!isDbAvailable()) return [];
       const filter = transformWhere(args.where);
       const sort = transformOrderBy(args.orderBy);
       const skip = args.skip || 0;
@@ -522,6 +529,7 @@ function createCollectionWrapper(collectionName: string) {
     },
 
     async findFirst(args: any = {}) {
+      if (!isDbAvailable()) return null;
       const filter = transformWhere(args.where);
       const sort = transformOrderBy(args.orderBy);
       const docs = await getCol().find(filter).sort(sort).limit(1).toArray();
@@ -546,6 +554,7 @@ function createCollectionWrapper(collectionName: string) {
     },
 
     async findUnique(args: any = {}) {
+      if (!isDbAvailable()) return null;
       const filter = transformWhere(args.where);
       const doc = await getCol().findOne(filter);
       if (!doc) return null;
@@ -641,6 +650,7 @@ function createCollectionWrapper(collectionName: string) {
     },
 
     async count(args: any = {}) {
+      if (!isDbAvailable()) return 0;
       const filter = transformWhere(args.where);
       return await getCol().countDocuments(filter);
     },

@@ -53,6 +53,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Dynamic published package routes
   try {
+    if (!process.env.MONGODB_URI && !process.env.DATABASE_URL) {
+      return staticRoutes;
+    }
+
     const packages = await db.package.findMany({
       where: { status: "PUBLISHED" },
       select: { slug: true, updatedAt: true },

@@ -3,10 +3,14 @@ import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 
 export const runtime = "nodejs";
-export const revalidate = 60; // Cache for 60 seconds
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
   try {
+    if (!process.env.MONGODB_URI && !process.env.DATABASE_URL) {
+      return NextResponse.json([]);
+    }
     const slides = await db.heroSlide.findMany({
       where: {
         OR: [
