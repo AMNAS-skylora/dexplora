@@ -6,6 +6,7 @@ import { PackagesSlider } from "@/components/public/PackagesSlider";
 import { DeparturesCalendar } from "@/components/public/DeparturesCalendar";
 import { TestimonialSlider } from "@/components/public/TestimonialSlider";
 import { DestinationSlider } from "@/components/public/DestinationSlider";
+import { InstagramSlider } from "@/components/public/InstagramSlider";
 import { Reveal } from "@/components/animation/Reveal";
 import { StaggerContainer, StaggerItem } from "@/components/animation/Stagger";
 import Link from "next/link";
@@ -50,6 +51,19 @@ export default async function HomePage() {
   let destinations: any[] = [];
   let galleryPreview: any[] = [];
   let testimonials: any[] = [];
+  let instagramPosts: any[] = [];
+
+  try {
+    instagramPosts = await db.instagramPost.findMany({
+      where: { isActive: true },
+      orderBy: [
+        { displayOrder: "asc" },
+        { createdAt: "desc" },
+      ],
+    });
+  } catch (error) {
+    console.error("Error fetching instagramPosts:", error);
+  }
 
   try {
     heroSlides = await db.heroSlide.findMany({
@@ -399,7 +413,12 @@ export default async function HomePage() {
         </Reveal>
       </section>
 
-      {/* 9. CTA Banner */}
+      {/* 9. Instagram Post Slider Section */}
+      {instagramPosts.length > 0 && (
+        <InstagramSlider posts={instagramPosts} />
+      )}
+
+      {/* 10. CTA Banner */}
       <section className="w-full max-w-7xl mx-auto px-0 md:px-6 lg:px-8">
         <Reveal direction="up" duration={650}>
           <div className="bg-gradient-to-r from-[#3478F6] to-[#2563EB] text-white rounded-none md:rounded-3xl p-8 sm:p-12 lg:p-16 text-center space-y-6 shadow-xl relative overflow-hidden">

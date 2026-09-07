@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { updateReviewStatus } from "@/actions";
+import { updateReviewStatus, getArchiveStatusSummary } from "@/actions";
+import { ArchiveWarningBanner } from "@/components/admin/ArchiveWarningBanner";
 import {
   Package,
   Calendar,
@@ -14,6 +15,7 @@ import {
   XCircle,
   Clock,
   Star,
+  Archive,
 } from "lucide-react";
 
 
@@ -33,6 +35,7 @@ export default async function AdminDashboardPage() {
     recentBookings,
     recentEnquiries,
     pendingReviews,
+    archiveSummary,
   ] = await Promise.all([
     db.package.count(),
     db.package.count({ where: { status: "PUBLISHED" } }),
@@ -57,12 +60,14 @@ export default async function AdminDashboardPage() {
       take: 5,
       orderBy: { createdAt: "desc" },
     }),
+    getArchiveStatusSummary(),
   ]);
 
   const statCards = [
     { label: "Total Packages", value: totalPackages, sub: `${publishedPackages} Published`, icon: Package, href: "/admin/packages" },
     { label: "Upcoming Trips", value: totalUpcomingTrips, sub: "Active Departures", icon: Calendar, href: "/admin/upcoming-trips" },
     { label: "Bookings", value: totalBookings, sub: `${newBookingsCount} New`, icon: BookmarkCheck, href: "/admin/bookings" },
+    { label: "Data Archives", value: archiveSummary?.pendingArchivesCount || 0, sub: `${archiveSummary?.expiringWithin7DaysCount || 0} Expiring Soon`, icon: Archive, href: "/admin/archives" },
     { label: "Contact Enquiries", value: totalEnquiries, sub: "Customer Messages", icon: Mail, href: "/admin/enquiries" },
     { label: "Pending Reviews", value: pendingReviewsCount, sub: "Needs Moderation", icon: MessageSquare, href: "/admin/testimonials" },
     { label: "Gallery Photos", value: totalGalleryImages, sub: "Published Photos", icon: ImageIcon, href: "/admin/gallery" },
@@ -75,6 +80,11 @@ export default async function AdminDashboardPage() {
         <h1 className="text-2xl font-extrabold text-[#0B1026]">Admin Overview Dashboard</h1>
         <p className="text-xs text-[#667085]">Real-time database statistics and pending action items.</p>
       </div>
+
+      {/* Archive Warning Banner */}
+      {archiveSummary?.activeArchives && archiveSummary.activeArchives.length > 0 && (
+        <ArchiveWarningBanner archives={archiveSummary.activeArchives} />
+      )}
 
       {/* Stat Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

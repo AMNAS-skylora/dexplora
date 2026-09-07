@@ -59,6 +59,17 @@ interface EnrichedBatch {
   pendingAmount: number;
 }
 
+function toSafeInputDate(dateVal: any): string {
+  if (!dateVal) return "";
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().split("T")[0];
+  } catch {
+    return "";
+  }
+}
+
 interface UpcomingTripManagerClientProps {
   batches: EnrichedBatch[];
   packages: PackageOption[];
@@ -103,8 +114,8 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
     setEditingBatch(b);
     setSelectedPackageId(b.packageId);
     setBatchName(b.batchName || "");
-    setStartDate(typeof b.startDate === "string" ? b.startDate.split("T")[0] : new Date(b.startDate).toISOString().split("T")[0]);
-    setEndDate(typeof b.endDate === "string" ? b.endDate.split("T")[0] : new Date(b.endDate).toISOString().split("T")[0]);
+    setStartDate(toSafeInputDate(b.startDate));
+    setEndDate(toSafeInputDate(b.endDate));
     setTotalSeats(b.totalSeats);
     setStatus(b.status);
     setBoardingPoint(b.boardingPoint || "");

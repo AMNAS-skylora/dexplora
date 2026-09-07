@@ -15,6 +15,8 @@ export interface SiteSettingsMap {
   seo_title: string;
   seo_description: string;
   footer_text: string;
+  booking_auto_cleanup_enabled: string;
+  booking_retention_days: string;
 }
 
 export const defaultSettings: SiteSettingsMap = {
@@ -32,6 +34,8 @@ export const defaultSettings: SiteSettingsMap = {
   seo_title: "Dexplora Tour Planners | Budget & Group Trips from Kerala",
   seo_description: "Book Malayali guided group tours to Meghalaya, Mahabaleshwar, Matheran, Kashmir & Goa with Dexplora Tour Planners.",
   footer_text: "Dexplora Tour Planners is a premier Kerala-based travel company specializing in budget group departures.",
+  booking_auto_cleanup_enabled: "false",
+  booking_retention_days: "30",
 };
 
 export async function getSiteSettings(): Promise<SiteSettingsMap> {

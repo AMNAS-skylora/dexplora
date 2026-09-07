@@ -25,12 +25,6 @@ interface StatItem {
   value: string;
 }
 
-interface TeamMember {
-  name: string;
-  role: string;
-  photo?: string;
-}
-
 export default async function AboutPage() {
   const settings = await getSiteSettings();
   let about: any = null;
@@ -40,8 +34,16 @@ export default async function AboutPage() {
     console.error("Error fetching aboutContent:", error);
   }
 
-  const stats: StatItem[] = about?.statsJson ? JSON.parse(about.statsJson) : [];
-  const team: TeamMember[] = about?.teamJson ? JSON.parse(about.teamJson) : [];
+  let stats: StatItem[] = [];
+
+  if (about?.statsJson) {
+    try {
+      stats = JSON.parse(about.statsJson);
+      if (!Array.isArray(stats)) stats = [];
+    } catch {
+      stats = [];
+    }
+  }
 
   return (
     <div className="w-full min-w-0 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-8 lg:py-10 space-y-8 sm:space-y-12 lg:space-y-16">
@@ -135,40 +137,6 @@ export default async function AboutPage() {
           </div>
         </div>
       </section>
-
-      {/* Team / Leaders */}
-      {team.length > 0 && (
-        <section className="w-full space-y-6">
-          <div className="text-left sm:text-center max-w-2xl sm:mx-auto space-y-1">
-            <span className="text-[clamp(11px,3vw,13px)] font-bold uppercase tracking-[0.06em] text-[#3478F6] block">
-              The People Behind Dexplora
-            </span>
-            <h2 className="text-[clamp(22px,6vw,34px)] font-bold text-[#0B1026] leading-tight">
-              Meet Our Leadership & Guides
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 justify-center">
-            {team.map((member, idx) => (
-              <div key={idx} className="bg-white rounded-2xl border border-[#E5EAF2] p-5 text-center space-y-3 shadow-xs">
-                <div className="w-20 h-20 rounded-full overflow-hidden mx-auto relative bg-gray-100 border-2 border-[#3478F6]">
-                  {member.photo ? (
-                    <Image src={member.photo} alt={member.name} fill sizes="80px" className="object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-lg font-bold text-[#3478F6]">
-                      {member.name.charAt(0)}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-[#0B1026]">{member.name}</h3>
-                  <p className="text-xs text-[#3478F6] font-semibold">{member.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }

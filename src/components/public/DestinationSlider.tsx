@@ -107,7 +107,6 @@ export function DestinationSlider({ destinations }: DestinationSliderProps) {
                     alt={dest.name}
                     fill
                     sizes="(max-width: 480px) 230px, (max-width: 768px) 270px, 295px"
-                    unoptimized={dest.coverImage.includes("unsplash.com")}
                     className="object-cover object-center group-hover:scale-105 transition-transform duration-500 ease-out pointer-events-none"
                     draggable={false}
                     loading={idx < 4 ? "eager" : "lazy"}

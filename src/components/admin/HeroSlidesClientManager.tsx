@@ -201,8 +201,17 @@ export function HeroSlidesClientManager({
     setFormSubtitle(slide.subtitle || "");
     setFormImageUrl(slide.imageUrl || "");
     setFormImagePublicId(slide.imagePublicId || "");
-    setFormStartDate(slide.startDate ? new Date(slide.startDate).toISOString().split("T")[0] : "");
-    setFormEndDate(slide.endDate ? new Date(slide.endDate).toISOString().split("T")[0] : "");
+    const safeFormatDate = (val: any) => {
+      if (!val) return "";
+      try {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
+      } catch {
+        return "";
+      }
+    };
+    setFormStartDate(safeFormatDate(slide.startDate));
+    setFormEndDate(safeFormatDate(slide.endDate));
     setFormStartingPrice(slide.startingPrice !== null && slide.startingPrice !== undefined ? slide.startingPrice : "");
     setFormRealPrice(slide.realPrice !== null && slide.realPrice !== undefined ? slide.realPrice : "");
     setFormCtaText(slide.ctaText || "");

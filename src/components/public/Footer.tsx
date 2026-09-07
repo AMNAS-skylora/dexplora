@@ -171,11 +171,6 @@ export function Footer({ settings }: FooterProps) {
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-400">
           <p>© {new Date().getFullYear()} Dexplora Tour Planners. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <Link href="/admin/login" className="hover:text-white text-[11px] underline">
-              Admin Login
-            </Link>
-          </div>
         </div>
       </div>
     </footer>

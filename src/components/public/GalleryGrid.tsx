@@ -20,6 +20,7 @@ interface GalleryGridProps {
 export function GalleryGrid({ images }: GalleryGridProps) {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [visibleCount, setVisibleCount] = useState(12);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -32,6 +33,8 @@ export function GalleryGrid({ images }: GalleryGridProps) {
     selectedCategory === "All"
       ? images
       : images.filter((img) => img.category === selectedCategory);
+
+  const displayedImages = filteredImages.slice(0, visibleCount);
 
   const handleNext = useCallback(() => {
     if (lightboxIndex !== null && lightboxIndex < filteredImages.length - 1) {
@@ -103,49 +106,64 @@ export function GalleryGrid({ images }: GalleryGridProps) {
       )}
 
       {/* Grid: 2 cols on mobile (gap 8px), 3 on tablet, 4 on desktop, with grid-auto-flow: dense */}
-      {filteredImages.length > 0 ? (
-        <div className="relative z-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-flow-dense gap-2 sm:gap-3.5 min-w-0 transition-opacity duration-300">
-          {filteredImages.map((img, idx) => {
-            const isFeatured = isFeaturedItem(idx);
+      {displayedImages.length > 0 ? (
+        <div className="space-y-8">
+          <div className="relative z-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-flow-dense gap-2 sm:gap-3.5 min-w-0 transition-opacity duration-300">
+            {displayedImages.map((img, idx) => {
+              const isFeatured = isFeaturedItem(idx);
 
-            return (
-              <div
-                key={img.id}
-                onClick={() => setLightboxIndex(idx)}
-                className={`relative aspect-square w-full ${
-                  isFeatured ? "col-span-2 row-span-2 rounded-[16px] p-[2px] bg-gradient-to-br from-[#3478F6]/35 via-[#6366F1]/15 to-white/60 shadow-md" : "col-span-1 row-span-1 rounded-[12px] border border-[#E5EAF2] shadow-xs"
-                } overflow-hidden cursor-pointer group bg-[#EEF2F7] min-w-0 transition-all duration-300 active:scale-[0.98]`}
-              >
-                <div className={`relative w-full h-full ${isFeatured ? "rounded-[14px]" : "rounded-[11px]"} overflow-hidden`}>
-                  <Image
-                    src={img.url}
-                    alt={img.title || img.destination?.name || "Travel memory photo"}
-                    fill
-                    sizes={isFeatured ? "(max-width: 640px) 100vw, (max-width: 1024px) 66vw, 50vw" : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"}
-                    priority={idx < 4}
-                    className="object-cover object-center group-hover:scale-[1.025] transition-transform duration-350 ease-out"
-                  />
+              return (
+                <div
+                  key={img.id}
+                  onClick={() => setLightboxIndex(idx)}
+                  className={`relative aspect-square w-full ${
+                    isFeatured ? "col-span-2 row-span-2 rounded-[16px] p-[2px] bg-gradient-to-br from-[#3478F6]/35 via-[#6366F1]/15 to-white/60 shadow-md" : "col-span-1 row-span-1 rounded-[12px] border border-[#E5EAF2] shadow-xs"
+                  } overflow-hidden cursor-pointer group bg-[#EEF2F7] min-w-0 transition-all duration-300 active:scale-[0.98]`}
+                >
+                  <div className={`relative w-full h-full ${isFeatured ? "rounded-[14px]" : "rounded-[11px]"} overflow-hidden`}>
+                    <Image
+                      src={img.url}
+                      alt={img.title || img.destination?.name || "Travel memory photo"}
+                      fill
+                      sizes={isFeatured ? "(max-width: 640px) 100vw, (max-width: 1024px) 66vw, 50vw" : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"}
+                      priority={idx < 4}
+                      loading={idx < 4 ? "eager" : "lazy"}
+                      className="object-cover object-center group-hover:scale-[1.025] transition-transform duration-350 ease-out"
+                    />
 
-                  {/* Overlay for Destination / Title Info */}
-                  {(img.destination || img.title) && (
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#040A14]/75 via-transparent to-transparent opacity-90 p-3 sm:p-4 flex flex-col justify-end text-white pointer-events-none">
-                      {img.destination && (
-                        <span className={`font-bold text-[#3478F6] uppercase tracking-wider flex items-center gap-1 ${isFeatured ? "text-xs" : "text-[10.5px]"}`}>
-                          <MapPin className={`${isFeatured ? "w-3.5 h-3.5" : "w-3 h-3"} text-[#3478F6] shrink-0`} />
-                          <span className="truncate">{img.destination.name}</span>
-                        </span>
-                      )}
-                      {img.title && (
-                        <h4 className={`font-semibold text-white leading-tight truncate mt-0.5 ${isFeatured ? "text-sm sm:text-base font-bold" : "text-[12px]"}`}>
-                          {img.title}
-                        </h4>
-                      )}
-                    </div>
-                  )}
+                    {/* Overlay for Destination / Title Info */}
+                    {(img.destination || img.title) && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#040A14]/75 via-transparent to-transparent opacity-90 p-3 sm:p-4 flex flex-col justify-end text-white pointer-events-none">
+                        {img.destination && (
+                          <span className={`font-bold text-[#3478F6] uppercase tracking-wider flex items-center gap-1 ${isFeatured ? "text-xs" : "text-[10.5px]"}`}>
+                            <MapPin className={`${isFeatured ? "w-3.5 h-3.5" : "w-3 h-3"} text-[#3478F6] shrink-0`} />
+                            <span className="truncate">{img.destination.name}</span>
+                          </span>
+                        )}
+                        {img.title && (
+                          <h4 className={`font-semibold text-white leading-tight truncate mt-0.5 ${isFeatured ? "text-sm sm:text-base font-bold" : "text-[12px]"}`}>
+                            {img.title}
+                          </h4>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          {visibleCount < filteredImages.length && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={() => setVisibleCount((prev) => prev + 12)}
+                className="h-11 px-6 rounded-2xl bg-[#3478F6] hover:bg-[#2563EB] text-white font-bold text-xs shadow-sm transition-all cursor-pointer min-h-[44px]"
+              >
+                Load More Memories ({filteredImages.length - visibleCount} remaining)
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="relative z-10 text-center py-16 text-[#64748B] text-sm bg-[#F8FAFF] rounded-2xl border border-[#DBE6FF]">

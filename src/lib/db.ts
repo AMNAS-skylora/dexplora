@@ -1,9 +1,10 @@
 import { MongoClient, ObjectId } from "mongodb";
 
-const options = {};
-
-let client: MongoClient | null = null;
-let clientPromise: Promise<MongoClient> | null = null;
+const mongoOptions = {
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  connectTimeoutMS: 10000,
+};
 
 declare global {
   var _mongoClient: MongoClient | undefined;
@@ -11,12 +12,12 @@ declare global {
 }
 
 export function getClientPromise(): Promise<MongoClient> {
-  const rawUri = process.env.MONGODB_URI;
+  const rawUri = process.env.MONGODB_URI || process.env.DATABASE_URL;
   const uri = rawUri?.trim();
 
   if (!uri) {
     throw new Error(
-      "MONGODB_URI is missing. Add a valid MongoDB connection string to the environment variables."
+      "MONGODB_URI is missing. Add a valid MongoDB connection string to environment variables."
     );
   }
 
@@ -26,28 +27,20 @@ export function getClientPromise(): Promise<MongoClient> {
     );
   }
 
-  if (process.env.NODE_ENV === "development") {
-    if (!global._mongoClientPromise) {
-      client = new MongoClient(uri, options);
-      global._mongoClientPromise = client.connect();
-    }
-    return global._mongoClientPromise;
-  } else {
-    if (!clientPromise) {
-      client = new MongoClient(uri, options);
-      clientPromise = client.connect();
-    }
-    return clientPromise;
+  if (!global._mongoClientPromise) {
+    global._mongoClient = new MongoClient(uri, mongoOptions);
+    global._mongoClientPromise = global._mongoClient.connect();
   }
+  return global._mongoClientPromise;
 }
 
 export function getDb() {
-  const rawUri = process.env.MONGODB_URI;
+  const rawUri = process.env.MONGODB_URI || process.env.DATABASE_URL;
   const uri = rawUri?.trim();
 
   if (!uri) {
     throw new Error(
-      "MONGODB_URI is missing. Add a valid MongoDB connection string to the environment variables."
+      "MONGODB_URI is missing. Add a valid MongoDB connection string to environment variables."
     );
   }
 
@@ -59,19 +52,11 @@ export function getDb() {
 
   const dbName = process.env.MONGODB_DB || undefined;
 
-  if (process.env.NODE_ENV === "development") {
-    if (!global._mongoClient) {
-      global._mongoClient = new MongoClient(uri, options);
-      global._mongoClientPromise = global._mongoClient.connect();
-    }
-    return global._mongoClient.db(dbName);
+  if (!global._mongoClient) {
+    global._mongoClient = new MongoClient(uri, mongoOptions);
+    global._mongoClientPromise = global._mongoClient.connect();
   }
-
-  if (!client) {
-    client = new MongoClient(uri, options);
-    clientPromise = client.connect();
-  }
-  return client.db(dbName);
+  return global._mongoClient.db(dbName);
 }
 
 function toObjectId(id: string | ObjectId): ObjectId {
@@ -697,6 +682,8 @@ export const db: Record<string, any> = {
   calendarEvent: createCollectionWrapper("CalendarEvent"),
   siteSetting: createCollectionWrapper("SiteSetting"),
   aboutContent: createCollectionWrapper("AboutContent"),
+  instagramPost: createCollectionWrapper("InstagramPost"),
+  archiveAuditLog: createCollectionWrapper("ArchiveAuditLog"),
 };
 
 export default db;

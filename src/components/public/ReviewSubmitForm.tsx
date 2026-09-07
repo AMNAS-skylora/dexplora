@@ -36,7 +36,7 @@ export function ReviewSubmitForm({ packages: _packages }: ReviewSubmitFormProps)
     if (result.error) {
       setErrorMessage(result.error);
     } else {
-      setSuccessMessage("Thank you! Your review has been submitted for admin moderation.");
+      setSuccessMessage("Thank you! Your review has been submitted for moderation.");
       (e.target as HTMLFormElement).reset();
       setRating(5);
     }

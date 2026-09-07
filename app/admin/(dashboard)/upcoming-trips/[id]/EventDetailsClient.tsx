@@ -19,6 +19,8 @@ import {
   deleteBatchBooking,
   updateTripBatch,
 } from "@/actions";
+import { calculateArchiveMetrics } from "@/lib/archive";
+import { SafeArchiveDeleteModal } from "@/components/admin/SafeArchiveDeleteModal";
 import {
   ArrowLeft,
   Users,
@@ -47,6 +49,8 @@ import {
   ShieldAlert,
   ChevronRight,
   Eye,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
 
 interface BookingRecord {
@@ -437,14 +441,52 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
             </div>
           </div>
 
-          <button
-            onClick={handleOpenAddModal}
-            className="bg-[#3478F6] hover:bg-[#2563EB] text-white px-6 py-3 rounded-2xl text-xs font-bold shadow-md transition-colors flex items-center gap-2 min-h-[46px] cursor-pointer self-start md:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Traveller / Booking</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+            <a
+              href={`/api/admin/archives/export/${batch.id}`}
+              download
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-2xl text-xs font-bold shadow-md transition-colors flex items-center gap-2 min-h-[46px] cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export Excel</span>
+            </a>
+
+            <button
+              onClick={handleOpenAddModal}
+              className="bg-[#3478F6] hover:bg-[#2563EB] text-white px-6 py-3 rounded-2xl text-xs font-bold shadow-md transition-colors flex items-center gap-2 min-h-[46px] cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Traveller / Booking</span>
+            </button>
+          </div>
         </div>
+
+        {/* Archive Expiry Alert Banner if event ended */}
+        {(() => {
+          const archiveMetrics = calculateArchiveMetrics(batch.endDate, 30);
+          if (!archiveMetrics.isPastEvent) return null;
+          return (
+            <div className="mt-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
+                <div>
+                  <span className="font-extrabold block">Event Completed • Retention Period Active</span>
+                  <span className="text-amber-800 font-medium">
+                    Archive expires on {formatDate(archiveMetrics.archiveExpiresAt)} ({archiveMetrics.statusText}).
+                  </span>
+                </div>
+              </div>
+              <a
+                href={`/api/admin/archives/export/${batch.id}`}
+                download
+                className="inline-flex items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 rounded-xl font-bold text-xs shadow-xs transition-colors shrink-0"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Download Excel Backup</span>
+              </a>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Metric Cards Row */}

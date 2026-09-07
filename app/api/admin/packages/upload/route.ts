@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
         {
           folder: "dexplora/packages/covers",
           resource_type: "image",
+          transformation: [{ quality: "auto:good", fetch_format: "auto", width: 1920, crop: "limit" }],
         },
         (error, result) => {
           if (error) {

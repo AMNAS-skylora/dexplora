@@ -60,7 +60,7 @@ export default function AdminLoginPage() {
         )}
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
           {/* Email Address */}
           <div>
             <label className="block text-xs font-bold text-[#0B1026] mb-1.5">
@@ -72,8 +72,8 @@ export default function AdminLoginPage() {
                 type="email"
                 name="email"
                 required
-                defaultValue="admin@dexplora.com"
-                placeholder="admin@dexplora.com"
+                autoComplete="off"
+                placeholder="Enter email address"
                 className="w-full h-12 bg-gray-50/80 border border-gray-200 rounded-xl pl-10 pr-4 text-xs font-semibold text-[#0B1026] placeholder:text-gray-400 focus:bg-white focus:border-[#3478F6] focus:ring-2 focus:ring-[#3478F6]/20 outline-none transition-all text-base sm:text-xs"
               />
             </div>
@@ -90,8 +90,8 @@ export default function AdminLoginPage() {
                 type={showPassword ? "text" : "password"}
                 name="password"
                 required
-                defaultValue="DexploraAdmin2026!"
-                placeholder="••••••••"
+                autoComplete="current-password"
+                placeholder="Enter password"
                 className="w-full h-12 bg-gray-50/80 border border-gray-200 rounded-xl pl-10 pr-11 text-xs font-semibold text-[#0B1026] placeholder:text-gray-400 focus:bg-white focus:border-[#3478F6] focus:ring-2 focus:ring-[#3478F6]/20 outline-none transition-all text-base sm:text-xs"
               />
               <button

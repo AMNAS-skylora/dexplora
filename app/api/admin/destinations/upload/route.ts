@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
         {
           folder: "dexplora/destinations",
           resource_type: "image",
+          transformation: [{ quality: "auto:good", fetch_format: "auto", width: 1920, crop: "limit" }],
         },
         (error, result) => {
           if (error) {

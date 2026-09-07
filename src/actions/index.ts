@@ -1495,4 +1495,464 @@ export async function quickCreateDestination(rawName: string) {
   }
 }
 
+export interface InstagramPostInputData {
+  instagramUrl: string;
+  thumbnailUrl?: string;
+  title?: string;
+  isActive?: boolean;
+  displayOrder?: number;
+}
+
+export async function validateInstagramUrl(url: string): Promise<boolean> {
+  const { parseInstagramUrl } = await import("@/lib/instagram");
+  return parseInstagramUrl(url) !== null;
+}
+
+export async function fetchInstagramPreview(url: string) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  const { parseInstagramUrl, fetchInstagramThumbnail } = await import("@/lib/instagram");
+  const parsed = parseInstagramUrl(url);
+  if (!parsed) {
+    return { error: "Invalid Instagram URL format. Please provide a valid post or reel URL." };
+  }
+
+  // Check duplicate in database
+  const existing = await db.instagramPost.findFirst({
+    where: {
+      OR: [
+        { normalizedUrl: parsed.normalizedUrl },
+        { shortcode: parsed.shortcode },
+        { instagramUrl: parsed.normalizedUrl },
+        { instagramUrl: url.trim() },
+      ],
+    },
+  });
+
+  const thumbnail = await fetchInstagramThumbnail(parsed.normalizedUrl);
+
+  return {
+    success: true,
+    isDuplicate: Boolean(existing),
+    duplicateId: existing?.id || null,
+    parsed,
+    thumbnailUrl: thumbnail,
+  };
+}
+
+// ================= INSTAGRAM POST ACTIONS =================
+export async function createInstagramPost(data: InstagramPostInputData) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  const rawUrl = data.instagramUrl?.trim() || "";
+  if (!rawUrl) {
+    return { error: "Instagram URL is required." };
+  }
+
+  const { parseInstagramUrl, fetchInstagramThumbnail } = await import("@/lib/instagram");
+  const parsed = parseInstagramUrl(rawUrl);
+
+  if (!parsed) {
+    return {
+      error:
+        "Invalid Instagram URL. Please enter a valid Instagram post or reel link (e.g. https://www.instagram.com/p/POST_ID/ or https://www.instagram.com/reel/REEL_ID/).",
+    };
+  }
+
+  try {
+    // Duplicate URL check
+    const existing = await db.instagramPost.findFirst({
+      where: {
+        OR: [
+          { normalizedUrl: parsed.normalizedUrl },
+          { shortcode: parsed.shortcode },
+          { instagramUrl: parsed.normalizedUrl },
+          { instagramUrl: rawUrl },
+        ],
+      },
+    });
+
+    if (existing) {
+      return { error: "This Instagram post or reel has already been added." };
+    }
+
+    // Auto-fetch thumbnail if not provided
+    let finalThumbnailUrl = data.thumbnailUrl?.trim() || null;
+    if (!finalThumbnailUrl) {
+      finalThumbnailUrl = await fetchInstagramThumbnail(parsed.normalizedUrl);
+    }
+
+    const isAct = data.isActive !== undefined ? Boolean(data.isActive) : true;
+    const order = Number(data.displayOrder) || 0;
+
+    const post = await db.instagramPost.create({
+      data: {
+        instagramUrl: parsed.normalizedUrl,
+        rawUrl: rawUrl,
+        normalizedUrl: parsed.normalizedUrl,
+        shortcode: parsed.shortcode,
+        mediaType: parsed.mediaType,
+        thumbnailUrl: finalThumbnailUrl,
+        title: data.title?.trim() || null,
+        isActive: isAct,
+        displayOrder: order,
+        order: order,
+      },
+    });
+
+    revalidatePath("/");
+    revalidatePath("/admin/instagram");
+    return { success: true, post };
+  } catch (error: any) {
+    console.error("Create instagram post error:", error);
+    return { error: error?.message || "Failed to create Instagram post." };
+  }
+}
+
+export async function updateInstagramPost(id: string, data: Partial<InstagramPostInputData>) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const existing = await db.instagramPost.findUnique({ where: { id } });
+    if (!existing) return { error: "Instagram post item not found" };
+
+    const { parseInstagramUrl, fetchInstagramThumbnail } = await import("@/lib/instagram");
+    let parsed = existing.shortcode ? { shortcode: existing.shortcode, mediaType: existing.mediaType || "post", normalizedUrl: existing.normalizedUrl || existing.instagramUrl } : null;
+
+    if (data.instagramUrl !== undefined) {
+      const rawUrl = data.instagramUrl.trim();
+      if (!rawUrl) {
+        return { error: "Instagram URL cannot be empty." };
+      }
+      const newParsed = parseInstagramUrl(rawUrl);
+      if (!newParsed) {
+        return { error: "Invalid Instagram URL. Please enter a valid Instagram post or reel link." };
+      }
+
+      // Check duplicate
+      const dup = await db.instagramPost.findFirst({
+        where: {
+          id: { ne: id },
+          OR: [
+            { normalizedUrl: newParsed.normalizedUrl },
+            { shortcode: newParsed.shortcode },
+            { instagramUrl: newParsed.normalizedUrl },
+            { instagramUrl: rawUrl },
+          ],
+        },
+      });
+
+      if (dup) {
+        return { error: "This Instagram post or reel has already been added." };
+      }
+      parsed = newParsed;
+    }
+
+    let finalThumbnail = data.thumbnailUrl !== undefined ? data.thumbnailUrl?.trim() || null : existing.thumbnailUrl;
+    if (data.instagramUrl !== undefined && !data.thumbnailUrl && parsed) {
+      finalThumbnail = await fetchInstagramThumbnail(parsed.normalizedUrl);
+    }
+
+    const order = data.displayOrder !== undefined ? Number(data.displayOrder) : existing.displayOrder;
+
+    const updated = await db.instagramPost.update({
+      where: { id },
+      data: {
+        ...(parsed && {
+          instagramUrl: parsed.normalizedUrl,
+          normalizedUrl: parsed.normalizedUrl,
+          shortcode: parsed.shortcode,
+          mediaType: parsed.mediaType,
+        }),
+        thumbnailUrl: finalThumbnail,
+        ...(data.title !== undefined && { title: data.title ? data.title.trim() : null }),
+        ...(data.isActive !== undefined && { isActive: Boolean(data.isActive) }),
+        ...(data.displayOrder !== undefined && { displayOrder: order, order: order }),
+      },
+    });
+
+    revalidatePath("/");
+    revalidatePath("/admin/instagram");
+    return { success: true, post: updated };
+  } catch (error: any) {
+    console.error("Update instagram post error:", error);
+    return { error: error?.message || "Failed to update Instagram post." };
+  }
+}
+
+export async function retryInstagramPostThumbnail(id: string) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const existing = await db.instagramPost.findUnique({ where: { id } });
+    if (!existing) return { error: "Instagram post not found" };
+
+    const { fetchInstagramThumbnail } = await import("@/lib/instagram");
+    const thumbnail = await fetchInstagramThumbnail(existing.normalizedUrl || existing.instagramUrl);
+
+    if (!thumbnail) {
+      return { error: "Could not fetch Instagram thumbnail. Please check internet connection or retry later." };
+    }
+
+    const updated = await db.instagramPost.update({
+      where: { id },
+      data: { thumbnailUrl: thumbnail },
+    });
+
+    revalidatePath("/");
+    revalidatePath("/admin/instagram");
+    return { success: true, thumbnailUrl: thumbnail, post: updated };
+  } catch (error: any) {
+    return { error: error?.message || "Failed to fetch thumbnail." };
+  }
+}
+
+export async function deleteInstagramPost(id: string) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const existing = await db.instagramPost.findUnique({ where: { id } });
+    if (!existing) return { error: "Instagram post not found" };
+
+    await db.instagramPost.delete({ where: { id } });
+
+    revalidatePath("/");
+    revalidatePath("/admin/instagram");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Delete instagram post error:", error);
+    return { error: error?.message || "Failed to delete Instagram post." };
+  }
+}
+
+export async function toggleInstagramPostActive(id: string, isActive: boolean) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const updated = await db.instagramPost.update({
+      where: { id },
+      data: { isActive: Boolean(isActive) },
+    });
+
+    revalidatePath("/");
+    revalidatePath("/admin/instagram");
+    return { success: true, post: updated };
+  } catch (error: any) {
+    return { error: error?.message || "Failed to toggle status." };
+  }
+}
+
+export async function reorderInstagramPosts(orderedIds: string[]) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+    return { error: "Invalid order payload." };
+  }
+
+  try {
+    const updates = orderedIds.map((id, index) =>
+      db.instagramPost.update({
+        where: { id },
+        data: { displayOrder: index, order: index },
+      })
+    );
+
+    await Promise.all(updates);
+
+    revalidatePath("/");
+    revalidatePath("/admin/instagram");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Reorder instagram posts error:", error);
+    return { error: error?.message || "Failed to save post order." };
+  }
+}
+
+// ================= DATA ARCHIVE & CLEANUP ACTIONS =================
+export async function getArchiveStatusSummary() {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const { getSiteSettings } = await import("@/lib/settings");
+    const { calculateArchiveMetrics } = await import("@/lib/archive");
+
+    const settings = await getSiteSettings();
+    const autoCleanupEnabled = settings.booking_auto_cleanup_enabled === "true";
+    const retentionDays = Math.max(1, parseInt(settings.booking_retention_days || "30", 10));
+
+    const now = new Date();
+
+    // Fetch batches whose endDate has passed
+    const pastBatches = await db.tripBatch.findMany({
+      where: {
+        endDate: { lte: now },
+      },
+      include: { package: true, bookings: true },
+      orderBy: { endDate: "desc" },
+    });
+
+    const activeArchives: any[] = [];
+    let expiringWithin7DaysCount = 0;
+    let totalArchivedBookings = 0;
+
+    for (const b of pastBatches) {
+      const bookings = Array.isArray(b.bookings) ? b.bookings : [];
+      if (bookings.length === 0) continue;
+
+      const metrics = calculateArchiveMetrics(b.endDate, retentionDays);
+      totalArchivedBookings += bookings.length;
+
+      if (metrics.daysRemaining <= 7) {
+        expiringWithin7DaysCount++;
+      }
+
+      activeArchives.push({
+        id: b.id,
+        batchName: b.batchName || "Standard Batch",
+        packageId: b.packageId,
+        packageTitle: b.package?.title || b.packageTitle || "Tour Package",
+        packageCoverImage: b.package?.coverImage || "/placeholder.jpg",
+        startDate: b.startDate,
+        endDate: b.endDate,
+        bookingsCount: bookings.length,
+        metrics,
+      });
+    }
+
+    // Fetch audit history logs
+    let auditLogs: any[] = [];
+    try {
+      auditLogs = await db.archiveAuditLog.findMany({
+        take: 20,
+        orderBy: { exportedAt: "desc" },
+      });
+    } catch (e) {
+      // Ignore if collection empty
+    }
+
+    return {
+      success: true,
+      pendingArchivesCount: activeArchives.length,
+      expiringWithin7DaysCount,
+      totalArchivedBookings,
+      autoCleanupEnabled,
+      retentionDays,
+      activeArchives,
+      auditLogs,
+    };
+  } catch (error: any) {
+    console.error("Get archive status summary error:", error);
+    return { error: error?.message || "Failed to fetch archive status." };
+  }
+}
+
+export async function deleteArchivedBatchBookingsAction(batchId: string) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  if (!batchId) return { error: "Batch ID is required." };
+
+  try {
+    const batch = await db.tripBatch.findUnique({
+      where: { id: batchId },
+      include: { package: true, bookings: true },
+    });
+
+    if (!batch) {
+      return { error: "Trip batch event not found." };
+    }
+
+    const bookings = Array.isArray(batch.bookings) ? batch.bookings : [];
+
+    // Delete booking records for this batch
+    const deleteResult = await db.booking.deleteMany({
+      where: { tripBatchId: batch.id },
+    });
+
+    await db.bookingEnquiry.deleteMany({
+      where: { tripBatchId: batch.id },
+    });
+
+    const deletedCount = deleteResult.count || bookings.length;
+
+    // Log deletion audit record
+    try {
+      await db.archiveAuditLog.create({
+        data: {
+          batchId: batch.id,
+          packageTitle: batch.package?.title || batch.packageTitle || "Unknown Package",
+          startDate: batch.startDate,
+          endDate: batch.endDate,
+          recordCount: deletedCount,
+          deletedAt: new Date(),
+          exportedBy: session.email || "Admin",
+          status: "DELETED",
+        },
+      });
+    } catch (logErr) {
+      console.warn("Write audit log error:", logErr);
+    }
+
+    revalidatePath("/");
+    revalidatePath("/admin/dashboard");
+    revalidatePath("/admin/archives");
+    revalidatePath("/admin/bookings");
+
+    return {
+      success: true,
+      deletedCount,
+      message: `Successfully deleted ${deletedCount} booking records for ${batch.package?.title || "this event"}.`,
+    };
+  } catch (error: any) {
+    console.error("Delete archived batch bookings error:", error);
+    return { error: error?.message || "Failed to delete archived booking records." };
+  }
+}
+
+export async function updateArchiveSettingsAction(data: {
+  autoCleanupEnabled: boolean;
+  retentionDays: number;
+}) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  const retention = Math.max(1, Number(data.retentionDays) || 30);
+  const enabledStr = Boolean(data.autoCleanupEnabled) ? "true" : "false";
+
+  try {
+    await Promise.all([
+      db.siteSetting.upsert({
+        where: { key: "booking_auto_cleanup_enabled" },
+        update: { value: enabledStr, updatedAt: new Date() },
+        create: { key: "booking_auto_cleanup_enabled", value: enabledStr },
+      }),
+      db.siteSetting.upsert({
+        where: { key: "booking_retention_days" },
+        update: { value: String(retention), updatedAt: new Date() },
+        create: { key: "booking_retention_days", value: String(retention) },
+      }),
+    ]);
+
+    revalidatePath("/");
+    revalidatePath("/admin/dashboard");
+    revalidatePath("/admin/archives");
+    revalidatePath("/admin/settings");
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Update archive settings error:", error);
+    return { error: error?.message || "Failed to save archive settings." };
+  }
+}
+
+
+
 

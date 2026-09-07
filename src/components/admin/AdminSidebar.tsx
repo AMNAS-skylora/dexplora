@@ -14,10 +14,29 @@ import {
   MessageSquare,
   BookmarkCheck,
   Mail,
+  Archive,
   Settings,
   LogOut,
   X,
 } from "lucide-react";
+
+function InstagramIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+    </svg>
+  );
+}
 
 interface AdminSidebarProps {
   onCloseMobile?: () => void;
@@ -33,10 +52,12 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
     { name: "Upcoming Trips", href: "/admin/upcoming-trips", icon: Calendar },
     { name: "Destinations", href: "/admin/destinations", icon: MapPin },
     { name: "Hero Slides", href: "/admin/hero-slides", icon: Sliders },
+    { name: "Instagram Feed", href: "/admin/instagram", icon: InstagramIcon },
     { name: "Gallery", href: "/admin/gallery", icon: ImageIcon },
     { name: "Testimonials", href: "/admin/testimonials", icon: MessageSquare },
     { name: "Bookings", href: "/admin/bookings", icon: BookmarkCheck },
     { name: "Enquiries", href: "/admin/enquiries", icon: Mail },
+    { name: "Data Archives", href: "/admin/archives", icon: Archive },
     { name: "Website Settings", href: "/admin/settings", icon: Settings },
   ];
 
