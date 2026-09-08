@@ -2,7 +2,9 @@ import { db } from "@/lib/db";
 import { getSiteSettings } from "@/lib/settings";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { MobileBookingBar } from "@/components/public/MobileBookingBar";
+import { PackageBookingButton } from "@/components/public/PackageBookingCTA";
 import { PackageCard } from "@/components/public/PackageCard";
+import { PackageDeparturesCalendar } from "@/components/public/PackageDeparturesCalendar";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -33,6 +35,7 @@ export const dynamic = "force-dynamic";
 
 interface PackageDetailPageProps {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ departure?: string }>;
 }
 
 export async function generateMetadata({ params }: PackageDetailPageProps): Promise<Metadata> {
@@ -97,8 +100,10 @@ export async function generateMetadata({ params }: PackageDetailPageProps): Prom
   };
 }
 
-export default async function PackageDetailPage({ params }: PackageDetailPageProps) {
+export default async function PackageDetailPage({ params, searchParams }: PackageDetailPageProps) {
   const { slug } = await params;
+  const search = searchParams ? await searchParams : {};
+  const initialDepartureId = search?.departure;
   const settings = await getSiteSettings();
 
   let pkg: any = null;
@@ -354,13 +359,15 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
             )}
 
             <div className="pt-1">
-              <Link
-                href={`/book-now?packageId=${pkg.slug}${nextBatch ? `&batchId=${nextBatch.id}` : ""}`}
+              <PackageBookingButton
+                packageData={pkg}
+                selectedDeparture={nextBatch}
+                whatsappNumber={settings?.whatsapp_number}
                 className="w-full h-[50px] bg-[#3478F6] hover:bg-[#2563EB] text-white font-bold text-sm sm:text-base rounded-xl shadow-xs transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Book Seats Now</span>
                 <ArrowRight className="w-4 h-4" />
-              </Link>
+              </PackageBookingButton>
             </div>
           </div>
 
@@ -507,46 +514,18 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
             </div>
           )}
 
-          {/* Upcoming Departure Dates Grid */}
-          {batches.length > 0 && (
-            <div className="space-y-3 pt-2">
-              <h2 className="text-[clamp(20px,5vw,27px)] font-bold text-[#0B1026] leading-tight">
-                Upcoming Departure Dates
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {batches.map((b: { id: string; batchName?: string | null; startDate: Date | string; endDate: Date | string; availableSeats: number; priceOverride?: number | null }) => (
-                  <div
-                    key={b.id}
-                    className="bg-white rounded-[16px] border border-[#E5EAF2] p-4 flex flex-col justify-between gap-3 shadow-xs"
-                  >
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-bold text-[#3478F6] uppercase tracking-wider block">
-                        {b.batchName || "Group Batch"}
-                      </span>
-                      <div className="text-xs sm:text-sm font-bold text-[#0B1026]">
-                        {formatDate(b.startDate)} — {formatDate(b.endDate)}
-                      </div>
-                      <span className="text-xs text-[#64748B] block">
-                        {b.availableSeats} seats remaining
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#F1F5F9]">
-                      <span className="text-sm font-bold text-[#3478F6]">
-                        {formatPrice(b.priceOverride || pkg.price || 0)}
-                      </span>
-                      <Link
-                        href={`/book-now?packageId=${pkg.slug}&batchId=${b.id}`}
-                        className="bg-[#3478F6] hover:bg-[#2563EB] text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all"
-                      >
-                        Book Batch
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Upcoming Departures Travel Calendar */}
+          <PackageDeparturesCalendar
+            packageId={pkg.id}
+            packageTitle={pkg.title}
+            packageSlug={pkg.slug}
+            destinationName={destinationName}
+            duration={pkg.duration}
+            startingPrice={pkg.price}
+            batches={batches}
+            initialDepartureId={initialDepartureId}
+            whatsappNumber={settings?.whatsapp_number}
+          />
 
           {/* Package Gallery Photos */}
           {gallery.length > 0 && (
@@ -623,25 +602,25 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
             )}
 
             <div className="space-y-3 pt-2">
-              <Link
-                href={`/book-now?packageId=${pkg.slug}${nextBatch ? `&batchId=${nextBatch.id}` : ""}`}
+              <PackageBookingButton
+                packageData={pkg}
+                selectedDeparture={nextBatch}
+                whatsappNumber={settings?.whatsapp_number}
                 className="w-full h-[48px] bg-[#3478F6] hover:bg-[#2563EB] text-white font-bold text-sm rounded-xl shadow-xs transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Book This Package</span>
                 <ArrowRight className="w-4 h-4" />
-              </Link>
+              </PackageBookingButton>
 
-              {whatsappUrl && (
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full h-[44px] bg-[#16A36A] hover:bg-[#128856] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Enquire on WhatsApp</span>
-                </a>
-              )}
+              <PackageBookingButton
+                packageData={pkg}
+                selectedDeparture={nextBatch}
+                whatsappNumber={settings?.whatsapp_number}
+                className="w-full h-[44px] bg-[#16A36A] hover:bg-[#128856] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Send className="w-4 h-4" />
+                <span>Enquire on WhatsApp</span>
+              </PackageBookingButton>
 
               {settings?.phone_1 && (
                 <a
@@ -718,6 +697,8 @@ export default async function PackageDetailPage({ params }: PackageDetailPagePro
         price={pkg.price}
         whatsappNumber={settings?.whatsapp_number}
         phoneNumber={settings?.phone_1}
+        selectedDeparture={nextBatch}
+        destinationName={destinationName}
       />
     </div>
   );

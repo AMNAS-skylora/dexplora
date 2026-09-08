@@ -11,27 +11,55 @@ export default async function AdminHeroSlidesPage() {
     redirect("/admin/login");
   }
 
-  const [initialSlides, upcomingEvents] = await Promise.all([
+  const [initialSlides, upcomingEvents, destinations] = await Promise.all([
     db.heroSlide.findMany({
+      include: {
+        destination: true,
+        event: {
+          include: {
+            destination: true,
+            package: {
+              include: { destination: true },
+            },
+          },
+        },
+      },
       orderBy: [
         { sortOrder: "asc" },
         { displayOrder: "asc" },
       ],
     }),
     db.tripBatch.findMany({
-      include: { package: true },
+      include: {
+        destination: true,
+        package: {
+          include: { destination: true },
+        },
+      },
       orderBy: { startDate: "asc" },
+    }),
+    db.destination.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, slug: true },
     }),
   ]);
 
   const sanitizedEvents = upcomingEvents.map((b: any) => {
     const pkg = b.package || {};
+    const destName =
+      b.destination?.name ||
+      pkg.destination?.name ||
+      b.arrivalDestination ||
+      pkg.destinationName ||
+      "";
+
     return {
       id: b.id,
       packageId: b.packageId,
       packageTitle: pkg.title || b.packageTitle || "Group Departure",
       batchName: b.batchName || "Standard Batch",
-      destination: b.arrivalDestination || pkg.arrivalLocation || "India",
+      destination: destName,
       startDate: b.startDate,
       endDate: b.endDate,
       duration: pkg.duration || "6 Days / 5 Nights",
@@ -48,6 +76,7 @@ export default async function AdminHeroSlidesPage() {
     <HeroSlidesClientManager
       initialSlides={initialSlides}
       upcomingEvents={sanitizedEvents}
+      destinations={destinations}
     />
   );
 }

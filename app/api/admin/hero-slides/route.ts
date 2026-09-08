@@ -13,6 +13,17 @@ export async function GET() {
     }
 
     const slides = await db.heroSlide.findMany({
+      include: {
+        destination: true,
+        event: {
+          include: {
+            destination: true,
+            package: {
+              include: { destination: true },
+            },
+          },
+        },
+      },
       orderBy: { sortOrder: "asc" },
     });
 
@@ -79,6 +90,7 @@ export async function POST(request: NextRequest) {
         title,
         badgeTag,
         subtitle,
+        destination,
         imageUrl,
         imagePublicId,
         startDate,
@@ -131,6 +143,7 @@ export async function POST(request: NextRequest) {
           title: title.trim(),
           badgeTag: badgeTag ? badgeTag.trim() : null,
           subtitle: subtitle ? subtitle.trim() : null,
+          destination: destination ? destination.trim() : null,
           imageUrl: imageUrl.trim(),
           desktopImage: imageUrl.trim(),
           imagePublicId: imagePublicId ? imagePublicId.trim() : null,

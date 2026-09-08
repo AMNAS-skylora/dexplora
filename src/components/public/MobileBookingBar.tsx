@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Send, Calendar } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { openWhatsAppBooking, WhatsAppDepartureData } from "@/lib/whatsapp";
 
 interface MobileBookingBarProps {
   packageSlug: string;
   packageTitle: string;
   price: number;
-  whatsappNumber: string;
+  whatsappNumber?: string | null;
   phoneNumber?: string;
+  selectedDeparture?: WhatsAppDepartureData | null;
+  destinationName?: string;
 }
 
 export function MobileBookingBar({
@@ -18,6 +20,8 @@ export function MobileBookingBar({
   packageTitle,
   price,
   whatsappNumber,
+  selectedDeparture,
+  destinationName,
 }: MobileBookingBarProps) {
   const [visible, setVisible] = useState(false);
 
@@ -30,10 +34,18 @@ export function MobileBookingBar({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const cleanNumber = whatsappNumber.replace(/\D/g, "");
-  const whatsappUrl = `https://wa.me/${cleanNumber}?text=Hi%20Dexplora,%20I%20want%20to%20book%20the%20package:%20${encodeURIComponent(
-    packageTitle
-  )}`;
+  const handleBooking = () => {
+    openWhatsAppBooking({
+      packageData: {
+        title: packageTitle,
+        slug: packageSlug,
+        price,
+        destination: destinationName ? { name: destinationName } : undefined,
+      },
+      selectedDeparture,
+      whatsappNumber,
+    });
+  };
 
   return (
     <div
@@ -41,7 +53,6 @@ export function MobileBookingBar({
         visible ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"
       }`}
     >
-
       <div className="flex items-center justify-between gap-3 max-w-md mx-auto">
         <div>
           <span className="text-[10px] text-[#667085] block uppercase font-bold tracking-wider">Starting at</span>
@@ -49,25 +60,26 @@ export function MobileBookingBar({
         </div>
 
         <div className="flex items-center gap-2 flex-1 justify-end">
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-[#16A36A] hover:bg-[#128856] text-white px-3 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform min-h-[44px]"
+          <button
+            type="button"
+            onClick={handleBooking}
+            className="bg-[#16A36A] hover:bg-[#128856] text-white px-3 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform min-h-[44px] cursor-pointer"
           >
             <Send className="w-3.5 h-3.5" />
             <span>WhatsApp</span>
-          </a>
+          </button>
 
-          <Link
-            href={`/book-now?packageId=${packageSlug}`}
-            className="bg-[#3478F6] hover:bg-[#2563EB] text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-transform min-h-[44px]"
+          <button
+            type="button"
+            onClick={handleBooking}
+            className="bg-[#3478F6] hover:bg-[#2563EB] text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-transform min-h-[44px] cursor-pointer"
           >
             <Calendar className="w-3.5 h-3.5" />
             <span>Book Now</span>
-          </Link>
+          </button>
         </div>
       </div>
     </div>
   );
 }
+

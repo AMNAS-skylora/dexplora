@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, Phone, Send } from "lucide-react";
 import { SiteSettingsMap } from "@/lib/settings";
 import { BrandLogo } from "@/components/public/BrandLogo";
+import { openWhatsAppBooking } from "@/lib/whatsapp";
 
 interface HeaderProps {
   settings: SiteSettingsMap;
@@ -87,12 +88,18 @@ export function Header({ settings }: HeaderProps) {
               <span>{settings.phone_1}</span>
             </a>
 
-            <Link
-              href="/book-now"
+            <button
+              type="button"
+              onClick={() =>
+                openWhatsAppBooking({
+                  whatsappNumber: settings.whatsapp_number,
+                  fallbackPhoneNumber: settings.phone_1,
+                })
+              }
               className="bg-[#3478F6] hover:bg-[#2563EB] text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition-all active:scale-95 min-h-[44px] flex items-center justify-center cursor-pointer"
             >
               Book Now
-            </Link>
+            </button>
           </div>
 
           {/* Mobile Hamburger Button */}
@@ -135,13 +142,19 @@ export function Header({ settings }: HeaderProps) {
           </div>
 
           <div className="pt-5 pb-6 border-t border-[#E8ECF3] space-y-3 mt-4">
-            <Link
-              href="/book-now"
-              onClick={() => setIsOpen(false)}
-              className="w-full bg-[#3478F6] text-white py-3.5 rounded-xl font-bold text-center flex items-center justify-center shadow-md hover:bg-[#2563EB] transition-colors text-base min-h-[48px]"
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                openWhatsAppBooking({
+                  whatsappNumber: settings.whatsapp_number,
+                  fallbackPhoneNumber: settings.phone_1,
+                });
+              }}
+              className="w-full bg-[#3478F6] text-white py-3.5 rounded-xl font-bold text-center flex items-center justify-center shadow-md hover:bg-[#2563EB] transition-colors text-base min-h-[48px] cursor-pointer"
             >
               Book Now
-            </Link>
+            </button>
 
             <a
               href={`https://wa.me/${settings.whatsapp_number}?text=Hi%20Dexplora,%20I%20have%20an%20enquiry`}

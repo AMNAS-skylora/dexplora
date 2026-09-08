@@ -64,14 +64,22 @@ export interface HeroSlideRecord {
   event?: UpcomingEventOption | null;
 }
 
+export interface DestinationOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface HeroSlidesClientManagerProps {
   initialSlides: any[];
   upcomingEvents: UpcomingEventOption[];
+  destinations?: DestinationOption[];
 }
 
 export function HeroSlidesClientManager({
   initialSlides,
   upcomingEvents,
+  destinations = [],
 }: HeroSlidesClientManagerProps) {
   const router = useRouter();
 
@@ -83,6 +91,7 @@ export function HeroSlidesClientManager({
       title: item.title || "",
       badgeTag: item.badgeTag || item.badge || "",
       subtitle: item.subtitle || "",
+      destination: item.destination?.name || (typeof item.destination === "string" ? item.destination : "") || "",
       imageUrl: item.imageUrl || item.desktopImage || "",
       imagePublicId: item.imagePublicId || "",
       startDate: item.startDate || null,
@@ -113,6 +122,7 @@ export function HeroSlidesClientManager({
   const [formTitle, setFormTitle] = useState("");
   const [formBadge, setFormBadge] = useState("");
   const [formSubtitle, setFormSubtitle] = useState("");
+  const [formDestination, setFormDestination] = useState("");
   const [formImageUrl, setFormImageUrl] = useState("");
   const [formImagePublicId, setFormImagePublicId] = useState("");
   const [formStartDate, setFormStartDate] = useState("");
@@ -178,6 +188,7 @@ export function HeroSlidesClientManager({
     setFormTitle("");
     setFormBadge("");
     setFormSubtitle("");
+    setFormDestination("");
     setFormImageUrl("");
     setFormImagePublicId("");
     setFormStartDate("");
@@ -199,6 +210,7 @@ export function HeroSlidesClientManager({
     setFormTitle(slide.title || "");
     setFormBadge(slide.badgeTag || "");
     setFormSubtitle(slide.subtitle || "");
+    setFormDestination((slide as any).destination?.name || (typeof (slide as any).destination === "string" ? (slide as any).destination : "") || "");
     setFormImageUrl(slide.imageUrl || "");
     setFormImagePublicId(slide.imagePublicId || "");
     const safeFormatDate = (val: any) => {
@@ -249,6 +261,7 @@ export function HeroSlidesClientManager({
       title: formTitle.trim() || undefined,
       badgeTag: formBadge.trim() || undefined,
       subtitle: formSubtitle.trim() || undefined,
+      destination: formDestination.trim() || undefined,
       imageUrl: formImageUrl.trim() || undefined,
       imagePublicId: formImagePublicId.trim() || undefined,
       startDate: formStartDate || undefined,
@@ -671,6 +684,25 @@ export function HeroSlidesClientManager({
                     )}
                   </div>
 
+                  {/* Auto-Populated Event Info */}
+                  {selectedEvent && (
+                    <div className="bg-[#F3F7FF] border border-[#DBE6FF] p-3.5 rounded-2xl space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-extrabold text-[#3478F6] uppercase text-[10px] tracking-wider">
+                          Auto-Derived Event Data
+                        </span>
+                        {selectedEvent.destination && (
+                          <span className="font-bold text-gray-600 text-[11px] bg-white px-2.5 py-0.5 rounded-md border border-[#DBE6FF]">
+                            Destination: <strong className="text-[#0B1026] font-black">{selectedEvent.destination}</strong>
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-bold text-[#0B1026] text-xs truncate">
+                        {selectedEvent.packageTitle} ({selectedEvent.batchName})
+                      </p>
+                    </div>
+                  )}
+
                   {/* Optional Overrides for Event Slide */}
                   {selectedEvent && (
                     <div className="pt-2 space-y-3">
@@ -718,7 +750,7 @@ export function HeroSlidesClientManager({
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-[#0B1026] mb-1">Badge Tag</label>
                       <input
@@ -728,6 +760,22 @@ export function HeroSlidesClientManager({
                         placeholder="PROMOTION / FESTIVAL SALE"
                         className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3 py-2 text-xs font-medium outline-none"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#0B1026] mb-1">Destination</label>
+                      <select
+                        value={formDestination}
+                        onChange={(e) => setFormDestination(e.target.value)}
+                        className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3 py-2 text-xs font-medium outline-none cursor-pointer"
+                      >
+                        <option value="">No Destination (Hide Card)</option>
+                        {destinations.map((d) => (
+                          <option key={d.id} value={d.name}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div>

@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay, Pagination, Navigation } from "swiper/modules";
+import { Autoplay, Pagination } from "swiper/modules";
 import Image from "next/image";
 import Link from "next/link";
 import { formatPrice, getHeroImage } from "@/lib/utils";
+import { openWhatsAppBooking } from "@/lib/whatsapp";
 import { ArrowRight, MapPin } from "lucide-react";
 import { HeroWordReveal } from "@/components/animation/HeroWordReveal";
 
@@ -15,7 +16,7 @@ interface SlideData {
   subtitle?: string | null;
   badge?: string | null;
   badgeTag?: string | null;
-  destination?: string | null;
+  destination?: any;
   startingPrice?: number | null;
   realPrice?: number | null;
   imageUrl?: string | null;
@@ -40,6 +41,8 @@ export function HeroSlider({ slides, whatsappNumber = "917034267985" }: HeroSlid
   if (!slides || slides.length === 0) return null;
 
   const cleanWhatsapp = whatsappNumber.replace(/\D/g, "");
+
+  const hasMultipleSlides = slides.length > 1;
 
   return (
     <div className="relative w-full max-w-full overflow-hidden bg-[#050A24] rounded-none md:rounded-3xl shadow-xl">
@@ -86,22 +89,39 @@ export function HeroSlider({ slides, whatsappNumber = "917034267985" }: HeroSlid
         }
       `}</style>
       <Swiper
-        modules={[Autoplay, Pagination, Navigation]}
-        autoplay={{ delay: 6000, disableOnInteraction: false }}
-        pagination={{ clickable: true }}
-        loop={slides.length > 1}
+        modules={[Autoplay, Pagination]}
+        autoplay={
+          hasMultipleSlides
+            ? { delay: 5000, disableOnInteraction: false }
+            : false
+        }
+        pagination={hasMultipleSlides ? { clickable: true } : false}
+        navigation={false}
+        loop={hasMultipleSlides}
+        allowTouchMove={hasMultipleSlides}
         className="w-full h-[460px] sm:h-[540px] md:h-[600px] lg:h-[640px]"
       >
         {slides.map((slide, index) => {
-          const title = typeof slide.title === "string" ? slide.title.trim() : "";
+          const packageData = slide.event?.package || slide.package;
+          const title = typeof slide.title === "string" ? slide.title.trim() : (packageData?.title || "");
           const subtitle = typeof slide.subtitle === "string" ? slide.subtitle.trim() : "";
           const bgImage = getHeroImage(slide) || "";
-          const whatsappUrl = slide.secondaryBtnUrl && slide.secondaryBtnUrl.includes("wa.me")
-            ? slide.secondaryBtnUrl
-            : (cleanWhatsapp
-                ? `https://wa.me/${cleanWhatsapp}?text=Hi%20Dexplora,%20I%20am%20interested%20in%20the%20${encodeURIComponent(title || "tour")}`
-                : "#");
           const hasImageError = imageErrors[slide.id] || !bgImage;
+
+          const destinationName =
+            packageData?.destination?.name ||
+            packageData?.destinationName ||
+            (typeof packageData?.destination === "string" ? packageData.destination : null) ||
+            (typeof slide.destination === "string" ? slide.destination : slide.destination?.name) ||
+            null;
+
+          const primaryUrl =
+            slide.primaryBtnUrl ||
+            (packageData?.slug
+              ? slide.event?.id
+                ? `/packages/${packageData.slug}?departure=${slide.event.id}`
+                : `/packages/${packageData.slug}`
+              : "/packages");
 
           return (
             <SwiperSlide key={slide.id} className="relative w-full h-full">
@@ -177,39 +197,60 @@ export function HeroSlider({ slides, whatsappNumber = "917034267985" }: HeroSlid
                       </div>
                     ) : null}
 
-                    <div className="bg-[#0A1228]/80 border border-white/15 backdrop-blur-md rounded-xl p-2.5 sm:p-3 min-h-[58px] flex items-center gap-2 min-w-0">
-                      <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[#3478F6]/20 text-[#3478F6] flex items-center justify-center shrink-0">
-                        <MapPin className="w-3.5 h-3.5" />
+                    {destinationName ? (
+                      <div className="bg-[#0A1228]/80 border border-white/15 backdrop-blur-md rounded-xl p-2.5 sm:p-3 min-h-[58px] flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[#3478F6]/20 text-[#3478F6] flex items-center justify-center shrink-0">
+                          <MapPin className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="truncate min-w-0">
+                          <span className="text-gray-300 font-semibold uppercase tracking-wider block info-label truncate">
+                            Destination
+                          </span>
+                          <span className="font-semibold text-white truncate block info-value">
+                            {destinationName}
+                          </span>
+                        </div>
                       </div>
-                      <div className="truncate min-w-0">
-                        <span className="text-gray-300 font-semibold uppercase tracking-wider block info-label truncate">
-                          Destination
-                        </span>
-                        <span className="font-semibold text-white truncate block info-value">
-                          {slide.destination || "Meghalaya"}
-                        </span>
-                      </div>
-                    </div>
+                    ) : null}
                   </div>
 
                   {/* Action Buttons */}
                   <div className="flex flex-col sm:flex-row gap-2 pt-1">
                     <Link
-                      href={slide.primaryBtnUrl || "/packages"}
+                      href={primaryUrl}
                       className="w-full sm:w-auto h-11 sm:h-12 bg-[#3478F6] hover:bg-[#2563EB] text-white px-5 rounded-xl font-bold shadow-md transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer hero-button"
                     >
                       <span className="truncate">{slide.primaryBtnText || "View Package"}</span>
                       <ArrowRight className="w-4 h-4 shrink-0" />
                     </Link>
 
-                    <a
-                      href={whatsappUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openWhatsAppBooking({
+                          packageData: {
+                            title: slide.package?.title || slide.event?.package?.title || title,
+                            slug: slide.package?.slug || slide.event?.package?.slug,
+                            price: slide.startingPrice || slide.event?.priceOverride,
+                            destination: destinationName,
+                          },
+                          selectedDeparture: slide.event
+                            ? {
+                                id: slide.event.id,
+                                batchName: slide.event.batchName,
+                                startDate: slide.event.startDate,
+                                endDate: slide.event.endDate,
+                                price: slide.event.priceOverride,
+                                availableSeats: slide.event.availableSeats,
+                              }
+                            : undefined,
+                          whatsappNumber,
+                        })
+                      }
                       className="w-full sm:w-auto h-11 sm:h-12 bg-[#080F23]/80 hover:bg-[#080F23] border border-white/20 text-white px-5 rounded-xl font-bold backdrop-blur-md transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer hero-button"
                     >
                       <span className="truncate">{slide.secondaryBtnText || "Book Seats Now"}</span>
-                    </a>
+                    </button>
                   </div>
                 </div>
               </div>

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { CalendarDays, MapPin, UsersRound, ArrowRight, Compass } from "lucide-react";
+import { CalendarDays, MapPin, UsersRound, ArrowRight, Compass, Loader2 } from "lucide-react";
 import { formatPrice, formatDate } from "@/lib/utils";
+import { openWhatsAppBooking } from "@/lib/whatsapp";
 
 interface UpcomingTripCardProps {
   id: string;
@@ -15,6 +17,7 @@ interface UpcomingTripCardProps {
   availableSeats: number;
   status: string;
   priceOverride?: number | null;
+  whatsappNumber?: string | null;
   packageItem: {
     title: string;
     slug: string;
@@ -35,10 +38,50 @@ export function UpcomingTripCard({
   availableSeats,
   status,
   priceOverride,
+  whatsappNumber,
   packageItem,
 }: UpcomingTripCardProps) {
   const [imgError, setImgError] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
+  const [isNavigating, startTransition] = useTransition();
+  const router = useRouter();
+
   const currentPrice = priceOverride || packageItem.price;
+
+  const handleNavigate = () => {
+    startTransition(() => {
+      router.push(`/packages/${packageItem.slug}?departure=${id}`);
+    });
+  };
+
+  const handleBookNow = () => {
+    if (isBooking) return;
+    setIsBooking(true);
+    try {
+      openWhatsAppBooking({
+        packageData: {
+          title: packageItem.title,
+          slug: packageItem.slug,
+          price: currentPrice,
+          destination: packageItem.destination,
+        },
+        selectedDeparture: {
+          id,
+          batchName,
+          startDate,
+          endDate,
+          price: currentPrice,
+          availableSeats,
+          totalSeats,
+        },
+        whatsappNumber,
+      });
+    } catch (err) {
+      console.error("Booking error:", err);
+    } finally {
+      setTimeout(() => setIsBooking(false), 1200);
+    }
+  };
 
   const getStatusBadge = (st: string) => {
     switch (st) {
@@ -98,7 +141,7 @@ export function UpcomingTripCard({
         </div>
 
         <h3 className="font-bold text-base sm:text-lg text-[#0B1026] hover:text-[#3478F6] transition-colors leading-tight line-clamp-2">
-          <Link href={`/packages/${packageItem.slug}`}>{packageItem.title}</Link>
+          <Link href={`/packages/${packageItem.slug}?departure=${id}`}>{packageItem.title}</Link>
         </h3>
 
         <div className="space-y-1.5 text-xs text-[#667085]">
@@ -134,19 +177,39 @@ export function UpcomingTripCard({
         </div>
 
         <div className="flex items-center gap-2 justify-end shrink-0">
-          <Link
-            href={`/packages/${packageItem.slug}`}
-            className="h-[44px] px-3 sm:px-3.5 rounded-[11px] bg-[#F3F7FF] hover:bg-[#3478F6] text-[#3478F6] hover:text-white font-semibold text-xs transition-colors border border-[#E5EDFF] flex items-center justify-center"
+          <button
+            type="button"
+            onClick={handleNavigate}
+            disabled={isNavigating}
+            className="h-[44px] px-3 sm:px-3.5 rounded-[11px] bg-[#F3F7FF] hover:bg-[#3478F6] text-[#3478F6] hover:text-white font-semibold text-xs transition-colors border border-[#E5EDFF] flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-wait"
           >
-            Package
-          </Link>
-          <Link
-            href={`/book-now?packageId=${packageItem.slug}&batchId=${id}`}
-            className="h-[44px] px-3.5 sm:px-4 rounded-[11px] bg-[#3478F6] hover:bg-[#2563EB] text-white font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap"
+            {isNavigating ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Loading...</span>
+              </>
+            ) : (
+              <span>View Trip</span>
+            )}
+          </button>
+          <button
+            type="button"
+            disabled={isBooking}
+            onClick={handleBookNow}
+            className="h-[44px] px-3.5 sm:px-4 rounded-[11px] bg-[#3478F6] hover:bg-[#2563EB] disabled:bg-[#3478F6]/70 text-white font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer disabled:cursor-wait"
           >
-            <span>Book Now</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+            {isBooking ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Booking...</span>
+              </>
+            ) : (
+              <>
+                <span>Book Now</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

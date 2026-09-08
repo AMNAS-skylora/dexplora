@@ -353,7 +353,11 @@ async function populateBatchRelations(docs: any, include: any) {
     if (pkgIds.length > 0) {
       const objectIds = pkgIds.map((id: string) => toObjectId(id));
       const pkgDocs = await getDb().collection("Package").find({ _id: { $in: objectIds } }).toArray();
-      const pkgMap = new Map(pkgDocs.map((p: any) => [p._id.toString(), transformDoc(p)]));
+      const transformedPkgs = transformDoc(pkgDocs);
+      const populatedPkgs = await populatePackageRelations(transformedPkgs, { destination: true });
+      const pkgMap = new Map(
+        (Array.isArray(populatedPkgs) ? populatedPkgs : [populatedPkgs]).map((p: any) => [p.id.toString(), p])
+      );
       items.forEach((item: any) => {
         if (item.packageId) {
           const matched = pkgMap.get(item.packageId.toString());

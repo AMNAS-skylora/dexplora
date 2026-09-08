@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Clock3, MapPin, UsersRound, CalendarDays, ArrowRight } from "lucide-react";
+import { Clock3, MapPin, UsersRound, CalendarDays, ArrowRight, Loader2 } from "lucide-react";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { getSafeImageUrl } from "@/lib/images";
 
@@ -42,8 +42,17 @@ export function PackageCard({
   batches,
 }: PackageCardProps) {
   const [imgError, setImgError] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
   const nextBatch = batches && batches.length > 0 ? batches[0] : null;
   const safeImg = imgError ? "/images/logo/logoblack.png" : getSafeImageUrl(coverImage);
+
+  const handleNavigate = () => {
+    startTransition(() => {
+      router.push(`/packages/${slug}`);
+    });
+  };
 
   return (
     <div className="group bg-white rounded-[18px] border border-[#E7ECF3] overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col h-full hover:-translate-y-1 w-full max-w-full min-w-0">
@@ -132,13 +141,24 @@ export function PackageCard({
             </div>
           </div>
 
-          <Link
-            href={`/packages/${slug}`}
-            className="h-[40px] px-3.5 rounded-[12px] bg-[#3478F6] hover:bg-[#2563EB] text-white font-semibold text-xs transition-all flex items-center justify-center gap-1 shrink-0 active:scale-98 cursor-pointer"
+          <button
+            type="button"
+            onClick={handleNavigate}
+            disabled={isPending}
+            className="h-[40px] px-3.5 rounded-[12px] bg-[#3478F6] hover:bg-[#2563EB] disabled:bg-[#3478F6]/70 text-white font-semibold text-xs transition-all flex items-center justify-center gap-1 shrink-0 active:scale-98 cursor-pointer disabled:cursor-wait"
           >
-            <span>View Details</span>
-            <ArrowRight className="w-3.5 h-3.5 stroke-[2] shrink-0" />
-          </Link>
+            {isPending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                <span>Loading...</span>
+              </>
+            ) : (
+              <>
+                <span>View Details</span>
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2] shrink-0" />
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

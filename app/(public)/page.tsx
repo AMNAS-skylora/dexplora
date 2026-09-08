@@ -3,10 +3,10 @@ import { getSiteSettings } from "@/lib/settings";
 import { HeroSlider } from "@/components/public/HeroSlider";
 import { PackageCard } from "@/components/public/PackageCard";
 import { PackagesSlider } from "@/components/public/PackagesSlider";
-import { DeparturesCalendar } from "@/components/public/DeparturesCalendar";
 import { TestimonialSlider } from "@/components/public/TestimonialSlider";
 import { DestinationSlider } from "@/components/public/DestinationSlider";
 import { InstagramSlider } from "@/components/public/InstagramSlider";
+import { GeneralBookingButton } from "@/components/public/PackageBookingCTA";
 import { Reveal } from "@/components/animation/Reveal";
 import { StaggerContainer, StaggerItem } from "@/components/animation/Stagger";
 import Link from "next/link";
@@ -72,6 +72,15 @@ export default async function HomePage() {
           { isActive: true },
           { active: true },
         ],
+      },
+      include: {
+        event: {
+          include: {
+            package: {
+              include: { destination: true },
+            },
+          },
+        },
       },
       orderBy: [
         { sortOrder: "asc" },
@@ -302,27 +311,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* 4. Dynamic Upcoming Departures Travel Calendar */}
-      <section className="w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-        <Reveal direction="up" duration={650}>
-          <div className="space-y-6">
-            <div className="text-center max-w-2xl mx-auto space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#3478F6]">
-                Upcoming Departures
-              </span>
-              <h2 className="text-2xl sm:text-4xl font-extrabold text-[#0B1026]">
-                Book Your Seat for the Next Trip
-              </h2>
-              <p className="text-sm text-[#667085]">
-                Tap any highlighted calendar date to preview trip details, pricing, and live seat availability.
-              </p>
-            </div>
-
-            <DeparturesCalendar batches={upcomingBatches} customEvents={customEvents} />
-          </div>
-        </Reveal>
-      </section>
-
 
       {/* 5. Popular Destinations */}
       <section className="w-full overflow-hidden py-10 sm:py-16 md:py-20 bg-gradient-to-b from-[#F3F7FF]/90 via-white to-[#F8FAFC] border-y border-[#E8ECF3]/60 relative">
@@ -430,12 +418,12 @@ export default async function HomePage() {
                 Plan your group trip, corporate retreat, or family vacation with Dexplora Tour Planners today.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-                <Link
-                  href="/book-now"
-                  className="bg-white text-[#3478F6] hover:bg-gray-100 px-8 py-3.5 rounded-xl font-extrabold text-base shadow-lg transition-all active:scale-95 min-h-[48px] flex items-center justify-center"
+                <GeneralBookingButton
+                  whatsappNumber={settings.whatsapp_number}
+                  className="bg-white text-[#3478F6] hover:bg-gray-100 px-8 py-3.5 rounded-xl font-extrabold text-base shadow-lg transition-all active:scale-95 min-h-[48px] flex items-center justify-center cursor-pointer"
                 >
                   Book Your Trip Now
-                </Link>
+                </GeneralBookingButton>
                 <a
                   href={`https://wa.me/${settings.whatsapp_number}?text=Hi%20Dexplora,%20I%20want%20to%20plan%20a%20trip`}
                   target="_blank"

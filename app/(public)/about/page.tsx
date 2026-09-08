@@ -97,7 +97,7 @@ export default async function AboutPage() {
             </p>
             <div className="pt-2">
               <Link
-                href="/book-now"
+                href="/packages"
                 className="inline-flex items-center justify-center bg-[#3478F6] hover:bg-[#2563EB] text-white px-5 sm:px-6 h-[46px] rounded-xl font-bold text-xs sm:text-sm shadow-xs transition-all active:scale-98"
               >
                 Start Exploring With Us

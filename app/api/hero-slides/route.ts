@@ -18,6 +18,17 @@ export async function GET() {
           { active: true },
         ],
       },
+      include: {
+        destination: true,
+        event: {
+          include: {
+            destination: true,
+            package: {
+              include: { destination: true },
+            },
+          },
+        },
+      },
       orderBy: [
         { sortOrder: "asc" },
         { displayOrder: "asc" },
@@ -60,6 +71,15 @@ export async function GET() {
           const primaryBtnText = slide.ctaText?.trim() || "View Trip";
           const primaryBtnUrl = slide.ctaLink?.trim() || (pkg.slug ? `/packages/${pkg.slug}` : "/packages");
 
+          const destinationName =
+            event.destination?.name ||
+            pkg.destination?.name ||
+            slide.destination?.name ||
+            event.arrivalDestination ||
+            pkg.destinationName ||
+            (typeof slide.destination === "string" ? slide.destination : null) ||
+            null;
+
           return {
             id: slide.id,
             type: "EVENT",
@@ -67,7 +87,7 @@ export async function GET() {
             badgeTag,
             badge: badgeTag,
             subtitle,
-            destination: event.arrivalDestination || pkg.destinationName || null,
+            destination: destinationName,
             imageUrl,
             desktopImage: imageUrl,
             mobileImage: slide.mobileImage || null,
@@ -75,7 +95,9 @@ export async function GET() {
             realPrice,
             primaryBtnText,
             primaryBtnUrl,
-            secondaryBtnText: "WhatsApp Us",
+            secondaryBtnText: "Book Seats Now",
+            event,
+            package: pkg,
           };
         } else {
           // CUSTOM slide
@@ -84,6 +106,11 @@ export async function GET() {
           }
 
           const imageUrl = slide.imageUrl || slide.desktopImage || "";
+          const destinationName =
+            slide.destination?.name ||
+            (typeof slide.destination === "string" ? slide.destination : null) ||
+            null;
+
           return {
             id: slide.id,
             type: "CUSTOM",
@@ -91,7 +118,7 @@ export async function GET() {
             badgeTag: slide.badgeTag || slide.badge || "PROMOTION",
             badge: slide.badgeTag || slide.badge || "PROMOTION",
             subtitle: slide.subtitle || null,
-            destination: slide.destination || null,
+            destination: destinationName,
             imageUrl,
             desktopImage: imageUrl,
             mobileImage: slide.mobileImage || null,
@@ -99,7 +126,7 @@ export async function GET() {
             realPrice: slide.realPrice || null,
             primaryBtnText: slide.ctaText || slide.primaryBtnText || "Explore Packages",
             primaryBtnUrl: slide.ctaLink || slide.primaryBtnUrl || "/packages",
-            secondaryBtnText: "WhatsApp Us",
+            secondaryBtnText: "Book Seats Now",
           };
         }
       })
