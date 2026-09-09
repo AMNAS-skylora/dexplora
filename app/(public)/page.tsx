@@ -66,7 +66,8 @@ export default async function HomePage() {
   }
 
   try {
-    heroSlides = await db.heroSlide.findMany({
+    const now = new Date();
+    const rawHeroSlides = await db.heroSlide.findMany({
       where: {
         OR: [
           { isActive: true },
@@ -86,6 +87,17 @@ export default async function HomePage() {
         { sortOrder: "asc" },
         { displayOrder: "asc" },
       ],
+    });
+
+    heroSlides = (rawHeroSlides || []).filter((slide: any) => {
+      const type = slide.type || "CUSTOM";
+      if (type === "SCHEDULED_OFFER") {
+        if (!slide.startDate || !slide.endDate) return false;
+        const start = new Date(slide.startDate);
+        const end = new Date(slide.endDate);
+        if (now < start || now >= end) return false;
+      }
+      return true;
     });
   } catch (error) {
     console.error("Error fetching heroSlides:", error);

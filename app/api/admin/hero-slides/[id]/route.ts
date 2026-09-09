@@ -60,6 +60,119 @@ export async function PUT(
       });
 
       return NextResponse.json(updatedSlide);
+    } else if (type === "SCHEDULED_OFFER") {
+      const {
+        title,
+        badgeTag,
+        subtitle,
+        destination,
+        imageUrl,
+        mobileImage,
+        videoUrl,
+        imagePublicId,
+        startDate,
+        endDate,
+        startingPrice,
+        realPrice,
+        currency,
+        discountLabel,
+        offerPoints,
+        ctaText,
+        ctaLink,
+        openInNewTab,
+        showCountdown,
+        showPrice,
+        showPoints,
+        showCTA,
+        textAlignment,
+        overlayStrength,
+        packageId,
+        isActive,
+        sortOrder,
+      } = body;
+
+      const finalTitle = title !== undefined ? String(title).trim() : existingSlide.title;
+      if (!finalTitle) {
+        return NextResponse.json({ error: "Offer Title is required for scheduled offer slide" }, { status: 400 });
+      }
+
+      const finalStartDate = startDate !== undefined ? startDate : existingSlide.startDate;
+      const finalEndDate = endDate !== undefined ? endDate : existingSlide.endDate;
+      if (!finalStartDate || !finalEndDate) {
+        return NextResponse.json({ error: "Start Date/Time and End Date/Time are required for scheduled offer" }, { status: 400 });
+      }
+
+      const startMs = new Date(finalStartDate).getTime();
+      const endMs = new Date(finalEndDate).getTime();
+      if (isNaN(startMs) || isNaN(endMs)) {
+        return NextResponse.json({ error: "Invalid Start or End Date format" }, { status: 400 });
+      }
+      if (endMs <= startMs) {
+        return NextResponse.json({ error: "End Date/Time must be after Start Date/Time" }, { status: 400 });
+      }
+
+      const parsedStartingPrice = startingPrice !== undefined && startingPrice !== null && startingPrice !== ""
+        ? Number(startingPrice)
+        : existingSlide.startingPrice;
+      const parsedRealPrice = realPrice !== undefined && realPrice !== null && realPrice !== ""
+        ? Number(realPrice)
+        : existingSlide.realPrice;
+
+      if (parsedStartingPrice !== null && (isNaN(parsedStartingPrice) || parsedStartingPrice < 0)) {
+        return NextResponse.json({ error: "Offer Price cannot be negative" }, { status: 400 });
+      }
+
+      if (parsedRealPrice !== null && (isNaN(parsedRealPrice) || parsedRealPrice < 0)) {
+        return NextResponse.json({ error: "Original Price cannot be negative" }, { status: 400 });
+      }
+
+      const parsedSortOrder = sortOrder !== undefined && sortOrder !== null
+        ? Number(sortOrder)
+        : (existingSlide.sortOrder ?? 0);
+      const activeState = isActive !== undefined ? Boolean(isActive) : (existingSlide.isActive ?? true);
+      const cleanPoints = offerPoints !== undefined
+        ? (Array.isArray(offerPoints) ? offerPoints.map((p: any) => String(p).trim()).filter(Boolean) : [])
+        : existingSlide.offerPoints;
+
+      const updatedSlide = await db.heroSlide.update({
+        where: { id },
+        data: {
+          type: "SCHEDULED_OFFER",
+          eventId: null,
+          packageId: packageId !== undefined ? (packageId ? String(packageId).trim() : null) : existingSlide.packageId,
+          title: finalTitle,
+          badgeTag: badgeTag !== undefined ? (badgeTag ? String(badgeTag).trim() : null) : existingSlide.badgeTag,
+          subtitle: subtitle !== undefined ? (subtitle ? String(subtitle).trim() : null) : existingSlide.subtitle,
+          destination: destination !== undefined ? (destination ? String(destination).trim() : null) : existingSlide.destination,
+          imageUrl: imageUrl !== undefined ? (imageUrl ? String(imageUrl).trim() : null) : existingSlide.imageUrl,
+          desktopImage: imageUrl !== undefined ? (imageUrl ? String(imageUrl).trim() : null) : existingSlide.desktopImage,
+          mobileImage: mobileImage !== undefined ? (mobileImage ? String(mobileImage).trim() : null) : existingSlide.mobileImage,
+          videoUrl: videoUrl !== undefined ? (videoUrl ? String(videoUrl).trim() : null) : existingSlide.videoUrl,
+          imagePublicId: imagePublicId !== undefined ? (imagePublicId ? String(imagePublicId).trim() : null) : existingSlide.imagePublicId,
+          startDate: new Date(finalStartDate).toISOString(),
+          endDate: new Date(finalEndDate).toISOString(),
+          startingPrice: parsedStartingPrice,
+          realPrice: parsedRealPrice,
+          currency: currency !== undefined ? (currency ? String(currency).trim() : "INR") : (existingSlide.currency || "INR"),
+          discountLabel: discountLabel !== undefined ? (discountLabel ? String(discountLabel).trim() : null) : existingSlide.discountLabel,
+          offerPoints: cleanPoints,
+          ctaText: ctaText !== undefined ? (ctaText ? String(ctaText).trim() : null) : existingSlide.ctaText,
+          ctaLink: ctaLink !== undefined ? (ctaLink ? String(ctaLink).trim() : null) : existingSlide.ctaLink,
+          openInNewTab: openInNewTab !== undefined ? Boolean(openInNewTab) : Boolean(existingSlide.openInNewTab),
+          showCountdown: showCountdown !== undefined ? Boolean(showCountdown) : (existingSlide.showCountdown ?? true),
+          showPrice: showPrice !== undefined ? Boolean(showPrice) : (existingSlide.showPrice ?? true),
+          showPoints: showPoints !== undefined ? Boolean(showPoints) : (existingSlide.showPoints ?? true),
+          showCTA: showCTA !== undefined ? Boolean(showCTA) : (existingSlide.showCTA ?? true),
+          textAlignment: textAlignment !== undefined ? textAlignment : (existingSlide.textAlignment || "left"),
+          overlayStrength: overlayStrength !== undefined ? overlayStrength : (existingSlide.overlayStrength || "medium"),
+          isActive: activeState,
+          active: activeState,
+          sortOrder: isNaN(parsedSortOrder) ? 0 : parsedSortOrder,
+          displayOrder: isNaN(parsedSortOrder) ? 0 : parsedSortOrder,
+        },
+      });
+
+      return NextResponse.json(updatedSlide);
     } else {
       // CUSTOM Slide
       const {
@@ -68,6 +181,7 @@ export async function PUT(
         subtitle,
         destination,
         imageUrl,
+        mobileImage,
         imagePublicId,
         startDate,
         endDate,
@@ -75,6 +189,7 @@ export async function PUT(
         realPrice,
         ctaText,
         ctaLink,
+        openInNewTab,
         isActive,
         sortOrder,
       } = body;
@@ -128,6 +243,7 @@ export async function PUT(
           destination: destination !== undefined ? (destination ? destination.trim() : null) : existingSlide.destination,
           imageUrl: finalImageUrl,
           desktopImage: finalImageUrl,
+          mobileImage: mobileImage !== undefined ? (mobileImage ? mobileImage.trim() : null) : existingSlide.mobileImage,
           imagePublicId: imagePublicId !== undefined ? (imagePublicId ? imagePublicId.trim() : null) : existingSlide.imagePublicId,
           startDate: startDate !== undefined ? (startDate || null) : existingSlide.startDate,
           endDate: endDate !== undefined ? (endDate || null) : existingSlide.endDate,
@@ -135,6 +251,7 @@ export async function PUT(
           realPrice: parsedRealPrice,
           ctaText: ctaText !== undefined ? (ctaText ? ctaText.trim() : null) : existingSlide.ctaText,
           ctaLink: ctaLink !== undefined ? (ctaLink ? ctaLink.trim() : null) : existingSlide.ctaLink,
+          openInNewTab: openInNewTab !== undefined ? Boolean(openInNewTab) : Boolean(existingSlide.openInNewTab),
           isActive: activeState,
           active: activeState,
           sortOrder: isNaN(parsedSortOrder) ? 0 : parsedSortOrder,

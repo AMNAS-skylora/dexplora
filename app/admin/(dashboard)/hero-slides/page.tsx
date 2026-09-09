@@ -11,10 +11,13 @@ export default async function AdminHeroSlidesPage() {
     redirect("/admin/login");
   }
 
-  const [initialSlides, upcomingEvents, destinations] = await Promise.all([
+  const [initialSlides, upcomingEvents, destinations, packages] = await Promise.all([
     db.heroSlide.findMany({
       include: {
         destination: true,
+        package: {
+          include: { destination: true },
+        },
         event: {
           include: {
             destination: true,
@@ -42,6 +45,11 @@ export default async function AdminHeroSlidesPage() {
       where: { active: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true, slug: true },
+    }),
+    db.package.findMany({
+      where: { status: "PUBLISHED" },
+      include: { destination: true },
+      orderBy: { title: "asc" },
     }),
   ]);
 
@@ -77,6 +85,7 @@ export default async function AdminHeroSlidesPage() {
       initialSlides={initialSlides}
       upcomingEvents={sanitizedEvents}
       destinations={destinations}
+      packages={packages}
     />
   );
 }
