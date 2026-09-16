@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Pagination } from "swiper/modules";
 import Image from "next/image";
 import Link from "next/link";
 import { formatPrice, getHeroImage } from "@/lib/utils";
+import { getOptimizedImageUrl } from "@/lib/images";
 import { openWhatsAppBooking } from "@/lib/whatsapp";
 import { ArrowRight, MapPin, Timer, Check, ExternalLink } from "lucide-react";
 import { HeroWordReveal } from "@/components/animation/HeroWordReveal";
@@ -153,7 +154,9 @@ export function HeroSlider({ slides: initialSlides, whatsappNumber = "9170342679
     setActiveSlides(initialSlides || []);
   }, [initialSlides]);
 
-  const serverTimeOffset = serverTime ? new Date(serverTime).getTime() - Date.now() : 0;
+  const serverTimeOffset = useMemo(() => {
+    return serverTime ? new Date(serverTime).getTime() - Date.now() : 0;
+  }, [serverTime]);
 
   const handleSlideExpire = useCallback((slideId: string) => {
     setActiveSlides((prev) => prev.filter((s) => s.id !== slideId));
@@ -162,6 +165,7 @@ export function HeroSlider({ slides: initialSlides, whatsappNumber = "9170342679
   if (!activeSlides || activeSlides.length === 0) return null;
 
   const hasMultipleSlides = activeSlides.length > 1;
+  const canLoop = activeSlides.length >= 2;
 
   return (
     <div className="relative w-full max-w-full overflow-hidden bg-[#050A24] rounded-none md:rounded-3xl shadow-xl">
@@ -212,13 +216,15 @@ export function HeroSlider({ slides: initialSlides, whatsappNumber = "9170342679
         key={activeSlides.length}
         modules={[Autoplay, Pagination]}
         autoplay={
-          hasMultipleSlides
+          canLoop
             ? { delay: 6000, disableOnInteraction: false }
             : false
         }
         pagination={hasMultipleSlides ? { clickable: true } : false}
         navigation={false}
-        loop={hasMultipleSlides}
+        loop={canLoop}
+        rewind={!canLoop && activeSlides.length > 1}
+        watchOverflow={true}
         allowTouchMove={hasMultipleSlides}
         className="w-full h-[480px] sm:h-[560px] md:h-[620px] lg:h-[660px]"
       >
@@ -231,6 +237,7 @@ export function HeroSlider({ slides: initialSlides, whatsappNumber = "9170342679
           const subtitle = typeof slide.subtitle === "string" ? slide.subtitle.trim() : "";
           const bgImage = getHeroImage(slide) || "";
           const hasImageError = imageErrors[slide.id] || !bgImage;
+          const isLcp = index === 0;
 
           const destinationName =
             packageData?.destination?.name ||
@@ -239,12 +246,13 @@ export function HeroSlider({ slides: initialSlides, whatsappNumber = "9170342679
             (typeof slide.destination === "string" ? slide.destination : slide.destination?.name) ||
             null;
 
+          const eventId = slide.event?.id;
           const primaryUrl =
             slide.primaryBtnUrl ||
-            (packageData?.slug
-              ? slide.event?.id
-                ? `/packages/${packageData.slug}?departure=${slide.event.id}`
-                : `/packages/${packageData.slug}`
+            (eventId
+              ? `/packages/${packageData?.slug || ""}?departure=${eventId}`
+              : packageData?.slug
+              ? `/packages/${packageData.slug}`
               : "/packages");
 
           const isExternalLink = slide.openInNewTab || (primaryUrl.startsWith("http://") || primaryUrl.startsWith("https://"));
@@ -290,12 +298,13 @@ export function HeroSlider({ slides: initialSlides, whatsappNumber = "9170342679
                       <source media="(max-width: 640px)" srcSet={slide.mobileImage} />
                     )}
                     <Image
-                      src={bgImage}
+                      src={getOptimizedImageUrl(bgImage, "large")}
                       alt={title || "Hero slide"}
                       fill
                       sizes="100vw"
-                      priority={index === 0}
-                      loading={index === 0 ? "eager" : "lazy"}
+                      priority={isLcp}
+                      loading={isLcp ? "eager" : "lazy"}
+                      fetchPriority={isLcp ? "high" : "auto"}
                       quality={85}
                       onError={() => {
                         setImageErrors((prev) => ({ ...prev, [slide.id]: true }));

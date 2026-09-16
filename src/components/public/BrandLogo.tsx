@@ -13,24 +13,24 @@ export function BrandLogo({
   priority = false,
   variant = "header",
 }: BrandLogoProps) {
-  let sizeClasses = "w-[130px] sm:w-[155px] lg:w-[170px] max-w-[170px] h-auto max-h-[42px] object-contain object-left";
   let logoSrc = "/images/logo/logoblack.png";
+  let sizeClasses = "h-[36px] sm:h-[40px] lg:h-[42px] w-auto object-contain object-left";
 
   if (variant === "footer") {
-    sizeClasses = "w-[130px] sm:w-[155px] max-w-[160px] h-auto max-h-[46px] object-contain object-left";
+    sizeClasses = "h-[38px] sm:h-[42px] w-auto object-contain object-left";
     logoSrc = "/images/logo/logowhite.png";
   } else if (variant === "admin") {
-    sizeClasses = "w-[170px] max-w-[180px] h-auto max-h-[54px] object-contain object-left";
+    sizeClasses = "h-[42px] sm:h-[48px] w-auto object-contain object-left";
     logoSrc = "/images/logo/logowhite.png";
   } else if (variant === "admin_mobile") {
-    sizeClasses = "w-[130px] max-w-[140px] h-auto max-h-[38px] object-contain object-left";
+    sizeClasses = "h-[34px] sm:h-[38px] w-auto object-contain object-left";
     logoSrc = "/images/logo/logoblack.png";
   }
 
   const isAboveFold = priority || variant === "header" || variant === "admin" || variant === "admin_mobile";
 
   return (
-    <div className={`inline-flex items-center shrink-0 min-w-0 group hover:opacity-92 transition-opacity ${className}`}>
+    <div className={`inline-flex items-center shrink-0 min-w-0 group hover:opacity-95 transition-opacity ${className}`}>
       <Image
         src={logoSrc}
         alt="Dexplora Tour Planners"
@@ -38,7 +38,7 @@ export function BrandLogo({
         height={44}
         priority={isAboveFold}
         loading={isAboveFold ? "eager" : "lazy"}
-        className={`w-auto object-contain shrink-0 block ${sizeClasses} ${imageClassName}`}
+        className={`shrink-0 block ${sizeClasses} ${imageClassName}`}
       />
     </div>
   );

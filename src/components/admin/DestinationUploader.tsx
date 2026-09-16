@@ -2,7 +2,7 @@
 
 import { useState, useRef, ChangeEvent, DragEvent } from "react";
 import Image from "next/image";
-import { UploadCloud, X, RefreshCw, AlertCircle } from "lucide-react";
+import { UploadCloud, X, RefreshCw, AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface DestinationUploaderProps {
   value?: string | null;
@@ -13,6 +13,7 @@ interface DestinationUploaderProps {
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 const MAX_SIZE_MB = 10;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+const RECOMMENDED_MIN_WIDTH = 1200;
 
 export function DestinationUploader({
   value,
@@ -22,12 +23,31 @@ export function DestinationUploader({
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [internalError, setInternalError] = useState<string | null>(null);
+  const [resolutionWarning, setResolutionWarning] = useState<string | null>(null);
+  const [imageMeta, setImageMeta] = useState<{ width: number; height: number; sizeMb: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const error = externalError || internalError;
 
+  const readDimensions = (file: File): Promise<{ width: number; height: number }> => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => {
+        resolve({ width: 0, height: 0 });
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    });
+  };
+
   const handleUploadFile = async (file: File) => {
     setInternalError(null);
+    setResolutionWarning(null);
 
     if (!ALLOWED_TYPES.includes(file.type)) {
       setInternalError("Please upload a valid image (JPG, PNG, WEBP, or AVIF).");
@@ -37,6 +57,16 @@ export function DestinationUploader({
     if (file.size > MAX_SIZE_BYTES) {
       setInternalError(`Image file size must be smaller than ${MAX_SIZE_MB} MB.`);
       return;
+    }
+
+    const dims = await readDimensions(file);
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+    setImageMeta({ width: dims.width, height: dims.height, sizeMb });
+
+    if (dims.width > 0 && dims.width < RECOMMENDED_MIN_WIDTH) {
+      setResolutionWarning(
+        `This image is only ${dims.width} × ${dims.height}px. For best website quality, upload an image at least ${RECOMMENDED_MIN_WIDTH}px wide.`
+      );
     }
 
     setIsUploading(true);
@@ -93,6 +123,8 @@ export function DestinationUploader({
   const handleRemove = () => {
     onChange("", "");
     setInternalError(null);
+    setResolutionWarning(null);
+    setImageMeta(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -100,9 +132,16 @@ export function DestinationUploader({
 
   return (
     <div className="w-full space-y-1.5">
-      <label className="block text-xs font-bold text-[#0B1026]">
-        Destination Image <span className="text-gray-400 font-normal">(Optional)</span>
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-bold text-[#0B1026]">
+          Destination Cover Image <span className="text-gray-400 font-normal">(Required)</span>
+        </label>
+        {imageMeta && (
+          <span className="text-[10px] font-mono font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+            {imageMeta.width} × {imageMeta.height} px • {imageMeta.sizeMb} MB
+          </span>
+        )}
+      </div>
 
       {value ? (
         <div className="relative w-full aspect-[16/9] max-h-56 rounded-2xl overflow-hidden bg-gray-900 border border-[#E8ECF3] group shadow-xs">
@@ -151,7 +190,7 @@ export function DestinationUploader({
           {isUploading ? (
             <div className="flex flex-col items-center gap-2 text-xs font-bold text-[#3478F6]">
               <RefreshCw className="w-6 h-6 animate-spin" />
-              <span>Uploading image to Cloudinary...</span>
+              <span>Optimizing & Uploading to Cloudinary...</span>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
@@ -161,7 +200,7 @@ export function DestinationUploader({
               <p className="text-xs text-gray-600 font-medium">
                 <span className="text-[#3478F6] font-bold">Click to upload</span> or drag and drop
               </p>
-              <p className="text-[10px] text-gray-400">JPG, PNG, WEBP or AVIF (Max 10 MB)</p>
+              <p className="text-[10px] text-gray-400">JPG, PNG, WEBP or AVIF (Recommended: ≥1200px wide)</p>
             </div>
           )}
         </div>
@@ -174,6 +213,13 @@ export function DestinationUploader({
         onChange={handleFileChange}
         className="hidden"
       />
+
+      {resolutionWarning && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium p-2.5 rounded-xl flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <span>{resolutionWarning}</span>
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1">

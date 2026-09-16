@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { X, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
+import { TravelImage } from "./TravelImage";
+import { sanitizePlaceName, getOptimizedImageUrl } from "@/lib/images";
 
 export interface GalleryItem {
   id: string;
@@ -76,7 +78,6 @@ export function GalleryGrid({ images }: GalleryGridProps) {
   // Deterministic repeating pattern for the "All" filter view (1x1 normal squares vs 2x2 featured squares)
   const isFeaturedItem = (index: number) => {
     if (selectedCategory !== "All") return false;
-    // Pattern: items at index 2, 7, 13 (index % 6 === 2) are featured 2x2 squares
     return index % 6 === 2;
   };
 
@@ -105,12 +106,14 @@ export function GalleryGrid({ images }: GalleryGridProps) {
         </div>
       )}
 
-      {/* Grid: 2 cols on mobile (gap 8px), 3 on tablet, 4 on desktop, with grid-auto-flow: dense */}
+      {/* Grid: 2 cols on mobile, 3 on tablet, 4 on desktop */}
       {displayedImages.length > 0 ? (
         <div className="space-y-8">
           <div className="relative z-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 grid-flow-dense gap-2 sm:gap-3.5 min-w-0 transition-opacity duration-300">
             {displayedImages.map((img, idx) => {
               const isFeatured = isFeaturedItem(idx);
+              const cleanTitle = sanitizePlaceName(img.title);
+              const cleanDestination = sanitizePlaceName(img.destination?.name);
 
               return (
                 <div
@@ -121,28 +124,27 @@ export function GalleryGrid({ images }: GalleryGridProps) {
                   } overflow-hidden cursor-pointer group bg-[#EEF2F7] min-w-0 transition-all duration-300 active:scale-[0.98]`}
                 >
                   <div className={`relative w-full h-full ${isFeatured ? "rounded-[14px]" : "rounded-[11px]"} overflow-hidden`}>
-                    <Image
+                    <TravelImage
                       src={img.url}
-                      alt={img.title || img.destination?.name || "Travel memory photo"}
-                      fill
+                      alt={cleanTitle || cleanDestination || "Travel memory photo"}
+                      variant="medium"
                       sizes={isFeatured ? "(max-width: 640px) 100vw, (max-width: 1024px) 66vw, 50vw" : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"}
                       priority={idx < 4}
-                      loading={idx < 4 ? "eager" : "lazy"}
                       className="object-cover object-center group-hover:scale-[1.025] transition-transform duration-350 ease-out"
                     />
 
                     {/* Overlay for Destination / Title Info */}
-                    {(img.destination || img.title) && (
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#040A14]/75 via-transparent to-transparent opacity-90 p-3 sm:p-4 flex flex-col justify-end text-white pointer-events-none">
-                        {img.destination && (
+                    {(cleanDestination || cleanTitle) && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#040A14]/75 via-transparent to-transparent opacity-90 p-3 sm:p-4 flex flex-col justify-end text-white pointer-events-none z-10">
+                        {cleanDestination && (
                           <span className={`font-bold text-[#3478F6] uppercase tracking-wider flex items-center gap-1 ${isFeatured ? "text-xs" : "text-[10.5px]"}`}>
                             <MapPin className={`${isFeatured ? "w-3.5 h-3.5" : "w-3 h-3"} text-[#3478F6] shrink-0`} />
-                            <span className="truncate">{img.destination.name}</span>
+                            <span className="truncate">{cleanDestination}</span>
                           </span>
                         )}
-                        {img.title && (
+                        {cleanTitle && (
                           <h4 className={`font-semibold text-white leading-tight truncate mt-0.5 ${isFeatured ? "text-sm sm:text-base font-bold" : "text-[12px]"}`}>
-                            {img.title}
+                            {cleanTitle}
                           </h4>
                         )}
                       </div>
@@ -171,7 +173,7 @@ export function GalleryGrid({ images }: GalleryGridProps) {
         </div>
       )}
 
-      {/* Fullscreen Lightbox Overlay (Preserves Original Uncropped Image Ratio) */}
+      {/* Fullscreen Lightbox Overlay */}
       {mounted && activeImage && (
         <div className="fixed inset-0 z-[99999] bg-[#030712]/94 backdrop-blur-md flex flex-col items-center justify-between p-4 sm:p-6 min-h-[100dvh] w-screen">
           {/* Top Bar Controls */}
@@ -202,8 +204,8 @@ export function GalleryGrid({ images }: GalleryGridProps) {
 
             <div className="relative w-full h-full flex items-center justify-center">
               <Image
-                src={activeImage.url}
-                alt={activeImage.title || "Travel photo"}
+                src={getOptimizedImageUrl(activeImage.url, "large")}
+                alt={sanitizePlaceName(activeImage.title) || "Travel photo"}
                 fill
                 sizes="100vw"
                 className="object-contain max-h-[88dvh]"
@@ -226,12 +228,12 @@ export function GalleryGrid({ images }: GalleryGridProps) {
             <div className="text-center text-white space-y-1 z-20 max-w-xl pb-2">
               {activeImage.destination && (
                 <span className="text-xs font-bold text-[#3478F6] uppercase tracking-wider block">
-                  {activeImage.destination.name}
+                  {sanitizePlaceName(activeImage.destination.name)}
                 </span>
               )}
-              {activeImage.title && <h3 className="text-base font-bold">{activeImage.title}</h3>}
+              {activeImage.title && <h3 className="text-base font-bold">{sanitizePlaceName(activeImage.title)}</h3>}
               {activeImage.caption && (
-                <p className="text-xs text-gray-300 line-clamp-2">{activeImage.caption}</p>
+                <p className="text-xs text-gray-300 line-clamp-2">{sanitizePlaceName(activeImage.caption)}</p>
               )}
             </div>
           )}

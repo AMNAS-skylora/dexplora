@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, MapPin, ChevronLeft, ChevronRight } from "lucide-react";
-import { getSafeImageUrl } from "@/lib/images";
+import { TravelImage } from "./TravelImage";
+import { sanitizePlaceName } from "@/lib/images";
 
 export interface DestinationItem {
   id: string;
@@ -76,82 +76,88 @@ export function DestinationSlider({ destinations }: DestinationSliderProps) {
           type="button"
           onClick={() => handleScroll("right")}
           disabled={!canScrollRight}
-          className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-200 bg-white text-[#0B1026] hover:bg-gray-50 flex items-center justify-center transition-all shadow-xs disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+          className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-200 bg-[#0B1026] text-white hover:bg-[#3478F6] flex items-center justify-center transition-all shadow-xs disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
           aria-label="Next Destinations"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Manual Scroll Track (No Autoplay / Static by Default) */}
+      {/* Manual Scroll Track */}
       <div
         ref={scrollRef}
         onScroll={updateScrollState}
         className="flex gap-4 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth py-2 px-1 sm:px-1 snap-x snap-mandatory"
       >
-        {itemsToDisplay.map((dest, idx) => (
-          <div
-            key={dest.id}
-            className="w-[calc(100vw-48px)] max-w-[270px] sm:w-[270px] md:w-[295px] shrink-0 aspect-[4/5] min-w-0 snap-start"
-          >
-            <Link
-              href={`/packages?destination=${dest.slug}`}
-              className="group relative block w-full h-full rounded-2xl sm:rounded-3xl overflow-hidden bg-gray-900 border border-gray-100/10 shadow-[0_8px_25px_rgba(11,16,38,0.08)] hover:shadow-[0_16px_35px_rgba(11,16,38,0.16)] hover:-translate-y-1.5 transition-all duration-300"
-              draggable={false}
+        {itemsToDisplay.map((dest, idx) => {
+          const cleanName = sanitizePlaceName(dest.name);
+          const cleanState = sanitizePlaceName(dest.state);
+
+          return (
+            <div
+              key={dest.id}
+              className="w-[calc(100vw-48px)] max-w-[270px] sm:w-[270px] md:w-[295px] shrink-0 aspect-[4/5] min-w-0 snap-start border-0 outline-none ring-0"
+              style={{ border: "none", outline: "none" }}
             >
-              {/* Image Container */}
-              <div className="relative w-full h-full overflow-hidden">
-                {dest.coverImage ? (
-                  <Image
-                    src={getSafeImageUrl(dest.coverImage)}
-                    alt={dest.name}
-                    fill
-                    sizes="(max-width: 480px) 230px, (max-width: 768px) 270px, 295px"
-                    className="object-cover object-center group-hover:scale-105 transition-transform duration-500 ease-out pointer-events-none"
-                    draggable={false}
-                    loading={idx < 4 ? "eager" : "lazy"}
-                  />
-                ) : (
-                  <div className="w-full h-full bg-[#050A24]" />
-                )}
-
-                {/* Gradient Overlay */}
+              <Link
+                href={`/packages?destination=${dest.slug}`}
+                className="group relative block w-full h-full rounded-[20px] overflow-hidden border-0 outline-none ring-0 focus:outline-none bg-transparent shadow-none md:hover:-translate-y-1 transition-all duration-300"
+                style={{ border: "none", outline: "none" }}
+                draggable={false}
+              >
+                {/* Image Container */}
                 <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    background:
-                      "linear-gradient(to top, rgba(5,10,36,0.85) 0%, rgba(5,10,36,0.35) 40%, rgba(5,10,36,0.05) 70%, transparent 100%)",
-                  }}
-                />
+                  className="relative w-full h-full overflow-hidden rounded-[20px] border-0 outline-none ring-0"
+                  style={{ border: "none", outline: "none" }}
+                >
+                  <TravelImage
+                    src={dest.coverImage}
+                    alt={cleanName}
+                    variant="medium"
+                    sizes="(max-width: 480px) 85vw, (max-width: 768px) 45vw, (max-width: 1200px) 30vw, 320px"
+                    priority={idx < 2}
+                    className="object-cover object-center md:group-hover:scale-[1.03] transition-transform duration-500 ease-out pointer-events-none"
+                    draggable={false}
+                  />
 
-                {/* Optional Badge Tag */}
-                {dest.badge && (
-                  <div className="absolute top-3.5 left-3.5 z-10 bg-white/20 backdrop-blur-md border border-white/30 px-3 py-1 rounded-full text-[10px] font-extrabold text-white uppercase tracking-wider shadow-xs">
-                    {dest.badge}
-                  </div>
-                )}
+                  {/* Gradient Overlay for Optimal Text Contrast */}
+                  <div
+                    className="absolute inset-0 pointer-events-none z-10"
+                    style={{
+                      background:
+                        "linear-gradient(to bottom, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.75) 100%)",
+                    }}
+                  />
 
-                {/* Content Box */}
-                <div className="absolute bottom-4 left-4 right-14 z-10 text-white space-y-0.5 pointer-events-none">
-                  <h3 className="text-base sm:text-lg md:text-xl font-extrabold text-white leading-tight tracking-tight drop-shadow-xs line-clamp-1">
-                    {dest.name}
-                  </h3>
-                  {dest.state && (
-                    <div className="flex items-center gap-1 text-xs text-white/80 font-medium truncate">
-                      <MapPin className="w-3.5 h-3.5 text-[#3478F6] shrink-0 stroke-[2]" />
-                      <span className="truncate">{dest.state}</span>
+                  {/* Optional Badge Tag */}
+                  {dest.badge && (
+                    <div className="absolute top-3.5 left-3.5 z-20 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-extrabold text-white uppercase tracking-wider shadow-xs">
+                      {dest.badge}
                     </div>
                   )}
-                </div>
 
-                {/* Circular Action Arrow Button */}
-                <div className="absolute bottom-3.5 right-3.5 z-10 w-10 h-10 rounded-full bg-[#3478F6] text-white border border-white/20 flex items-center justify-center shadow-md group-hover:bg-[#2563EB] group-hover:scale-110 transition-all duration-200 pointer-events-none">
-                  <ArrowUpRight className="w-4 h-4 stroke-[2.5] transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-200" />
+                  {/* Content Box */}
+                  <div className="absolute bottom-4 left-4 right-14 z-20 text-white space-y-0.5 pointer-events-none">
+                    <h3 className="text-base sm:text-lg md:text-xl font-extrabold text-white leading-tight tracking-tight drop-shadow-sm line-clamp-1">
+                      {cleanName}
+                    </h3>
+                    {cleanState && (
+                      <div className="flex items-center gap-1 text-xs text-white/90 font-medium truncate drop-shadow-xs">
+                        <MapPin className="w-3.5 h-3.5 text-[#3478F6] shrink-0 stroke-[2.2]" />
+                        <span className="truncate">{cleanState}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Circular Action Arrow Button */}
+                  <div className="absolute bottom-3.5 right-3.5 z-20 w-10 h-10 rounded-full bg-[#3478F6] text-white flex items-center justify-center shadow-md group-hover:bg-[#2563EB] group-hover:scale-105 transition-all duration-200 pointer-events-none">
+                    <ArrowUpRight className="w-4 h-4 stroke-[2.5] transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-200" />
+                  </div>
                 </div>
-              </div>
-            </Link>
-          </div>
-        ))}
+              </Link>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

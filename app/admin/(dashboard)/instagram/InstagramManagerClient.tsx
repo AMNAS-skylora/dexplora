@@ -29,8 +29,10 @@ import {
   fetchInstagramPreview,
   retryInstagramPostThumbnail,
   reorderInstagramPosts,
+  refreshAllInstagramThumbnails,
   InstagramPostInputData,
 } from "@/actions";
+import { getInstagramThumbnail } from "@/lib/instagram-client";
 import {
   Plus,
   Trash2,
@@ -68,11 +70,17 @@ function InstagramIcon(props: React.SVGProps<SVGSVGElement>) {
 
 export interface InstagramPost {
   id: string;
+  instagram_media_id?: string | null;
   instagramUrl: string;
   normalizedUrl?: string | null;
   shortcode?: string | null;
   mediaType?: "post" | "reel" | null;
+  media_type?: string | null;
+  media_product_type?: string | null;
   thumbnailUrl?: string | null;
+  thumbnail_url?: string | null;
+  cloudinary_thumbnail_url?: string | null;
+  thumbnail_status?: string | null;
   title?: string | null;
   isActive: boolean;
   displayOrder: number;
@@ -141,25 +149,31 @@ function SortablePostRow({
         </button>
 
         {/* Thumbnail Preview Card */}
-        <div className="relative w-16 h-20 sm:w-20 sm:h-24 rounded-xl overflow-hidden bg-gradient-to-br from-[#050A24] to-[#0B143A] shrink-0 border border-gray-200 shadow-xs">
-          {post.thumbnailUrl ? (
-            <Image
-              src={post.thumbnailUrl}
-              alt={post.title || "Instagram Post"}
-              fill
-              sizes="80px"
-              className="object-cover object-center"
-            />
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center p-2 text-white text-center bg-gradient-to-br from-[#833ab4]/90 via-[#fd1d1d]/80 to-[#fcb045]/90">
-              <InstagramIcon className="w-6 h-6 mb-1 drop-shadow-sm" />
-              <span className="text-[10px] font-bold leading-tight">No Preview</span>
-            </div>
-          )}
+        <div className="relative w-16 h-20 sm:w-20 sm:h-24 rounded-xl overflow-hidden bg-white shrink-0 border border-gray-200 shadow-xs flex items-center justify-center">
+          {(() => {
+            const thumbnail = getInstagramThumbnail(post);
+            if (thumbnail) {
+              return (
+                <Image
+                  src={thumbnail}
+                  alt={post.title || "Instagram Post"}
+                  fill
+                  sizes="80px"
+                  className="object-cover object-center"
+                />
+              );
+            }
+            return (
+              <div className="w-full h-full flex flex-col items-center justify-center p-1 text-center bg-white text-pink-500">
+                <InstagramIcon className="w-6 h-6 mb-0.5 text-pink-500" />
+                <span className="text-[9px] font-bold text-gray-500">No Image</span>
+              </div>
+            );
+          })()}
 
           {/* Media Type Badge */}
           <div className="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-md backdrop-blur-xs flex items-center gap-1">
-            {post.mediaType === "reel" ? (
+            {post.mediaType === "reel" || post.media_type === "VIDEO" || post.media_product_type === "REELS" ? (
               <>
                 <Film className="w-2.5 h-2.5 text-pink-400" />
                 <span>Reel</span>

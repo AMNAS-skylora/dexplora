@@ -61,6 +61,11 @@ export default async function HomePage() {
         { createdAt: "desc" },
       ],
     });
+
+    // Auto-trigger background thumbnail refresh if any active post is missing Cloudinary thumbnail
+    if (instagramPosts.some((p: any) => !p.cloudinary_thumbnail_url && !p.cloudinaryThumbnailUrl)) {
+      import("@/actions").then((actions) => actions.refreshAllInstagramThumbnails()).catch(() => {});
+    }
   } catch (error) {
     console.error("Error fetching instagramPosts:", error);
   }

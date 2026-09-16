@@ -3,10 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { CalendarDays, MapPin, UsersRound, ArrowRight, Compass, Loader2 } from "lucide-react";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { openWhatsAppBooking } from "@/lib/whatsapp";
+import { TravelImage } from "./TravelImage";
+import { sanitizePlaceName } from "@/lib/images";
 
 interface UpcomingTripCardProps {
   id: string;
@@ -41,12 +42,14 @@ export function UpcomingTripCard({
   whatsappNumber,
   packageItem,
 }: UpcomingTripCardProps) {
-  const [imgError, setImgError] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
   const [isNavigating, startTransition] = useTransition();
   const router = useRouter();
 
   const currentPrice = priceOverride || packageItem.price;
+
+  const cleanTitle = sanitizePlaceName(packageItem.title);
+  const cleanDestination = sanitizePlaceName(packageItem.destination?.name);
 
   const handleNavigate = () => {
     startTransition(() => {
@@ -60,10 +63,10 @@ export function UpcomingTripCard({
     try {
       openWhatsAppBooking({
         packageData: {
-          title: packageItem.title,
+          title: cleanTitle,
           slug: packageItem.slug,
           price: currentPrice,
-          destination: packageItem.destination,
+          destination: cleanDestination ? { name: cleanDestination } : packageItem.destination,
         },
         selectedDeparture: {
           id,
@@ -110,24 +113,16 @@ export function UpcomingTripCard({
 
   return (
     <div className="bg-white rounded-2xl border border-[#E8ECF3] p-3.5 sm:p-4 flex flex-col md:flex-row items-center gap-4 md:gap-5 shadow-sm hover:shadow-md transition-all">
-      {/* Image Thumbnail with Fallback */}
+      {/* Image Thumbnail */}
       <div className="relative w-full md:w-48 h-[160px] md:h-40 rounded-xl overflow-hidden shrink-0 bg-[#050A24]/10 flex items-center justify-center">
-        {!imgError && packageItem.coverImage ? (
-          <Image
-            src={packageItem.coverImage}
-            alt={packageItem.title}
-            fill
-            sizes="(max-width: 768px) 100vw, 200px"
-            className="object-cover object-center"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center p-4 text-center text-[#3478F6] space-y-1">
-            <Compass className="w-8 h-8" />
-            <span className="text-[11px] font-bold text-[#0B1026]">{packageItem.destination.name}</span>
-          </div>
-        )}
-        <div className="absolute top-2.5 left-2.5">
+        <TravelImage
+          src={packageItem.coverImage}
+          alt={cleanTitle}
+          variant="medium"
+          sizes="(max-width: 768px) 100vw, 200px"
+          className="object-cover object-center"
+        />
+        <div className="absolute top-2.5 left-2.5 z-10">
           {getStatusBadge(status)}
         </div>
       </div>
@@ -136,12 +131,12 @@ export function UpcomingTripCard({
       <div className="flex-1 w-full space-y-2">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-[#3478F6]">
           <MapPin className="w-3.5 h-3.5" />
-          <span>{packageItem.destination.name}</span>
+          <span>{cleanDestination}</span>
           {batchName && <span className="text-[#667085]">• {batchName}</span>}
         </div>
 
         <h3 className="font-bold text-base sm:text-lg text-[#0B1026] hover:text-[#3478F6] transition-colors leading-tight line-clamp-2">
-          <Link href={`/packages/${packageItem.slug}?departure=${id}`}>{packageItem.title}</Link>
+          <Link href={`/packages/${packageItem.slug}?departure=${id}`}>{cleanTitle}</Link>
         </h3>
 
         <div className="space-y-1.5 text-xs text-[#667085]">
@@ -215,4 +210,3 @@ export function UpcomingTripCard({
     </div>
   );
 }
-

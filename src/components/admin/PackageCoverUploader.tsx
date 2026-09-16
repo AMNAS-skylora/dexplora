@@ -2,7 +2,7 @@
 
 import { useState, useRef, ChangeEvent, DragEvent } from "react";
 import Image from "next/image";
-import { UploadCloud, X, RefreshCw, AlertCircle } from "lucide-react";
+import { UploadCloud, X, RefreshCw, AlertCircle, AlertTriangle } from "lucide-react";
 
 interface PackageCoverUploaderProps {
   value?: string | null;
@@ -14,6 +14,7 @@ interface PackageCoverUploaderProps {
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 const MAX_SIZE_MB = 10;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+const RECOMMENDED_MIN_WIDTH = 1200;
 
 export function PackageCoverUploader({
   value,
@@ -24,10 +25,29 @@ export function PackageCoverUploader({
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [resolutionWarning, setResolutionWarning] = useState<string | null>(null);
+  const [imageMeta, setImageMeta] = useState<{ width: number; height: number; sizeMb: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const readDimensions = (file: File): Promise<{ width: number; height: number }> => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => {
+        resolve({ width: 0, height: 0 });
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    });
+  };
 
   const handleUploadFile = async (file: File) => {
     setLocalError(null);
+    setResolutionWarning(null);
 
     if (!ALLOWED_TYPES.includes(file.type)) {
       setLocalError("Please upload JPG, PNG, WEBP, or AVIF.");
@@ -37,6 +57,16 @@ export function PackageCoverUploader({
     if (file.size > MAX_SIZE_BYTES) {
       setLocalError(`Image must be smaller than ${MAX_SIZE_MB} MB.`);
       return;
+    }
+
+    const dims = await readDimensions(file);
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+    setImageMeta({ width: dims.width, height: dims.height, sizeMb });
+
+    if (dims.width > 0 && dims.width < RECOMMENDED_MIN_WIDTH) {
+      setResolutionWarning(
+        `This image is only ${dims.width} × ${dims.height}px. For best website quality, upload an image at least ${RECOMMENDED_MIN_WIDTH}px wide.`
+      );
     }
 
     setIsUploading(true);
@@ -95,6 +125,8 @@ export function PackageCoverUploader({
   const handleRemove = () => {
     onChange("");
     setLocalError(null);
+    setResolutionWarning(null);
+    setImageMeta(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -108,9 +140,15 @@ export function PackageCoverUploader({
         <label className="block text-xs font-bold text-[#0B1026]">
           Cover Image * <span className="text-gray-400 font-normal">(Cloudinary Upload)</span>
         </label>
-        <span className="text-[11px] text-gray-400 font-medium hidden sm:inline">
-          Recommended: 1600 × 900 or larger (16:9)
-        </span>
+        {imageMeta ? (
+          <span className="text-[10px] font-mono font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+            {imageMeta.width} × {imageMeta.height} px • {imageMeta.sizeMb} MB
+          </span>
+        ) : (
+          <span className="text-[11px] text-gray-400 font-medium hidden sm:inline">
+            Recommended: 1600 × 900 or larger (16:9)
+          </span>
+        )}
       </div>
 
       {value ? (
@@ -163,7 +201,7 @@ export function PackageCoverUploader({
             <div className="flex flex-col items-center space-y-2">
               <RefreshCw className="w-7 h-7 text-[#3478F6] animate-spin" />
               <p className="text-xs font-bold text-gray-900">
-                Uploading cover image to Cloudinary...
+                Optimizing & Uploading cover image to Cloudinary...
               </p>
               <p className="text-[11px] text-gray-500">Please wait while we process your upload.</p>
             </div>
@@ -176,7 +214,7 @@ export function PackageCoverUploader({
                 <span className="text-[#3478F6]">Click to upload cover image</span> or drag and drop
               </p>
               <p className="text-[11px] text-gray-500">
-                JPG, PNG, WEBP, or AVIF (Max {MAX_SIZE_MB} MB)
+                JPG, PNG, WEBP, or AVIF (Recommended: ≥1200px wide)
               </p>
             </div>
           )}
@@ -190,6 +228,13 @@ export function PackageCoverUploader({
         onChange={handleFileChange}
         className="hidden"
       />
+
+      {resolutionWarning && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium p-2.5 rounded-xl flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <span>{resolutionWarning}</span>
+        </div>
+      )}
 
       {displayError && (
         <p role="alert" className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1 break-words">

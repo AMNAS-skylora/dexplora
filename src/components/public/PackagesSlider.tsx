@@ -21,6 +21,8 @@ export function PackagesSlider({ packages }: PackagesSliderProps) {
     );
   }
 
+  const canLoop = packages.length >= 7;
+
   return (
     <div className="w-full min-w-0 overflow-hidden packages-slider-container relative py-2">
       <style>{`
@@ -48,27 +50,32 @@ export function PackagesSlider({ packages }: PackagesSliderProps) {
       `}</style>
 
       {/* Desktop Navigation Arrows */}
-      <div className="hidden md:flex items-center gap-2 absolute -top-16 right-0 z-20">
-        <button
-          aria-label="Previous Package"
-          className="pkg-prev w-9 h-9 rounded-full border border-[#E2E8F0] bg-white text-[#0B1026] hover:bg-[#F8FAFC] hover:border-[#CBD5E1] flex items-center justify-center transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        <button
-          aria-label="Next Package"
-          className="pkg-next w-9 h-9 rounded-full border border-[#E2E8F0] bg-white text-[#0B1026] hover:bg-[#F8FAFC] hover:border-[#CBD5E1] flex items-center justify-center transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
+      {packages.length > 1 && (
+        <div className="hidden md:flex items-center gap-2 absolute -top-16 right-0 z-20">
+          <button
+            aria-label="Previous Package"
+            className="pkg-prev w-9 h-9 rounded-full border border-[#E2E8F0] bg-white text-[#0B1026] hover:bg-[#F8FAFC] hover:border-[#CBD5E1] flex items-center justify-center transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            aria-label="Next Package"
+            className="pkg-next w-9 h-9 rounded-full border border-[#E2E8F0] bg-white text-[#0B1026] hover:bg-[#F8FAFC] hover:border-[#CBD5E1] flex items-center justify-center transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <Swiper
         modules={[Navigation, Pagination]}
-        navigation={{ prevEl: ".pkg-prev", nextEl: ".pkg-next" }}
-        pagination={{ clickable: true, el: ".pkg-pagination" }}
+        navigation={packages.length > 1 ? { prevEl: ".pkg-prev", nextEl: ".pkg-next" } : false}
+        pagination={packages.length > 1 ? { clickable: true, el: ".pkg-pagination" } : false}
         slidesPerView={1.12}
         spaceBetween={12}
+        loop={canLoop}
+        rewind={!canLoop && packages.length > 1}
+        watchOverflow={true}
         grabCursor={true}
         allowTouchMove={true}
         touchRatio={1}
@@ -108,7 +115,9 @@ export function PackagesSlider({ packages }: PackagesSliderProps) {
       </Swiper>
 
       {/* Subtle Pagination Indicator */}
-      <div className="pkg-pagination flex justify-center items-center gap-1.5 mt-6 min-h-[16px]" />
+      {packages.length > 1 && (
+        <div className="pkg-pagination flex justify-center items-center gap-1.5 mt-6 min-h-[16px]" />
+      )}
     </div>
   );
 }

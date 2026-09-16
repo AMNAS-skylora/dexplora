@@ -1578,10 +1578,13 @@ export async function createInstagramPost(data: InstagramPostInputData) {
       return { error: "This Instagram post or reel has already been added." };
     }
 
-    // Auto-fetch thumbnail if not provided
-    let finalThumbnailUrl = data.thumbnailUrl?.trim() || null;
-    if (!finalThumbnailUrl) {
-      finalThumbnailUrl = await fetchInstagramThumbnail(parsed.normalizedUrl);
+    // Auto-fetch thumbnail details
+    const { fetchInstagramThumbnailDetails } = await import("@/lib/instagram");
+    let thumbnailDetails = await fetchInstagramThumbnailDetails(parsed.normalizedUrl);
+
+    if (data.thumbnailUrl?.trim()) {
+      thumbnailDetails.cloudinary_thumbnail_url = data.thumbnailUrl.trim();
+      thumbnailDetails.thumbnail_status = "READY";
     }
 
     const isAct = data.isActive !== undefined ? Boolean(data.isActive) : true;
@@ -1594,7 +1597,11 @@ export async function createInstagramPost(data: InstagramPostInputData) {
         normalizedUrl: parsed.normalizedUrl,
         shortcode: parsed.shortcode,
         mediaType: parsed.mediaType,
-        thumbnailUrl: finalThumbnailUrl,
+        thumbnailUrl: thumbnailDetails.cloudinary_thumbnail_url || thumbnailDetails.thumbnail_url,
+        cloudinary_thumbnail_url: thumbnailDetails.cloudinary_thumbnail_url,
+        thumbnail_url: thumbnailDetails.thumbnail_url,
+        thumbnail_source_url: thumbnailDetails.thumbnail_source_url,
+        thumbnail_status: thumbnailDetails.thumbnail_status,
         title: data.title?.trim() || null,
         isActive: isAct,
         displayOrder: order,
@@ -1619,7 +1626,7 @@ export async function updateInstagramPost(id: string, data: Partial<InstagramPos
     const existing = await db.instagramPost.findUnique({ where: { id } });
     if (!existing) return { error: "Instagram post item not found" };
 
-    const { parseInstagramUrl, fetchInstagramThumbnail } = await import("@/lib/instagram");
+    const { parseInstagramUrl, fetchInstagramThumbnailDetails } = await import("@/lib/instagram");
     let parsed = existing.shortcode ? { shortcode: existing.shortcode, mediaType: existing.mediaType || "post", normalizedUrl: existing.normalizedUrl || existing.instagramUrl } : null;
 
     if (data.instagramUrl !== undefined) {
@@ -1651,9 +1658,17 @@ export async function updateInstagramPost(id: string, data: Partial<InstagramPos
       parsed = newParsed;
     }
 
-    let finalThumbnail = data.thumbnailUrl !== undefined ? data.thumbnailUrl?.trim() || null : existing.thumbnailUrl;
-    if (data.instagramUrl !== undefined && !data.thumbnailUrl && parsed) {
-      finalThumbnail = await fetchInstagramThumbnail(parsed.normalizedUrl);
+    let thumbnailDetails = null;
+    if (parsed) {
+      thumbnailDetails = await fetchInstagramThumbnailDetails(parsed.normalizedUrl);
+    }
+    if (data.thumbnailUrl?.trim()) {
+      thumbnailDetails = {
+        cloudinary_thumbnail_url: data.thumbnailUrl.trim(),
+        thumbnail_url: data.thumbnailUrl.trim(),
+        thumbnail_source_url: data.thumbnailUrl.trim(),
+        thumbnail_status: "READY" as const,
+      };
     }
 
     const order = data.displayOrder !== undefined ? Number(data.displayOrder) : existing.displayOrder;
@@ -1667,7 +1682,13 @@ export async function updateInstagramPost(id: string, data: Partial<InstagramPos
           shortcode: parsed.shortcode,
           mediaType: parsed.mediaType,
         }),
-        thumbnailUrl: finalThumbnail,
+        ...(thumbnailDetails && {
+          thumbnailUrl: thumbnailDetails.cloudinary_thumbnail_url || thumbnailDetails.thumbnail_url,
+          cloudinary_thumbnail_url: thumbnailDetails.cloudinary_thumbnail_url,
+          thumbnail_url: thumbnailDetails.thumbnail_url,
+          thumbnail_source_url: thumbnailDetails.thumbnail_source_url,
+          thumbnail_status: thumbnailDetails.thumbnail_status,
+        }),
         ...(data.title !== undefined && { title: data.title ? data.title.trim() : null }),
         ...(data.isActive !== undefined && { isActive: Boolean(data.isActive) }),
         ...(data.displayOrder !== undefined && { displayOrder: order, order: order }),
@@ -1691,23 +1712,69 @@ export async function retryInstagramPostThumbnail(id: string) {
     const existing = await db.instagramPost.findUnique({ where: { id } });
     if (!existing) return { error: "Instagram post not found" };
 
-    const { fetchInstagramThumbnail } = await import("@/lib/instagram");
-    const thumbnail = await fetchInstagramThumbnail(existing.normalizedUrl || existing.instagramUrl);
+    const { fetchInstagramThumbnailDetails } = await import("@/lib/instagram");
+    const details = await fetchInstagramThumbnailDetails(existing.normalizedUrl || existing.instagramUrl);
 
-    if (!thumbnail) {
+    const finalThumbnail = details.cloudinary_thumbnail_url || details.thumbnail_url;
+    if (!finalThumbnail) {
       return { error: "Could not fetch Instagram thumbnail. Please check internet connection or retry later." };
     }
 
     const updated = await db.instagramPost.update({
       where: { id },
-      data: { thumbnailUrl: thumbnail },
+      data: {
+        thumbnailUrl: finalThumbnail,
+        cloudinary_thumbnail_url: details.cloudinary_thumbnail_url,
+        thumbnail_url: details.thumbnail_url,
+        thumbnail_source_url: details.thumbnail_source_url,
+        thumbnail_status: details.thumbnail_status,
+      },
     });
 
     revalidatePath("/");
     revalidatePath("/admin/instagram");
-    return { success: true, thumbnailUrl: thumbnail, post: updated };
+    return { success: true, thumbnailUrl: finalThumbnail, post: updated };
   } catch (error: any) {
     return { error: error?.message || "Failed to fetch thumbnail." };
+  }
+}
+
+export async function refreshAllInstagramThumbnails() {
+  try {
+    const { fetchInstagramThumbnailDetails } = await import("@/lib/instagram");
+    const posts = await db.instagramPost.findMany();
+
+    let updatedCount = 0;
+    for (const post of posts) {
+      const url = post.normalizedUrl || post.instagramUrl || post.rawUrl;
+      if (!url) continue;
+
+      // If no valid Cloudinary thumbnail exists or status is not READY
+      if (!post.cloudinary_thumbnail_url || post.thumbnail_status !== "READY" || post.cloudinary_thumbnail_url.includes("cdninstagram.com")) {
+        const details = await fetchInstagramThumbnailDetails(url);
+        if (details.cloudinary_thumbnail_url || details.thumbnail_url) {
+          const finalUrl = details.cloudinary_thumbnail_url || details.thumbnail_url;
+          await db.instagramPost.update({
+            where: { id: post.id },
+            data: {
+              thumbnailUrl: finalUrl,
+              cloudinary_thumbnail_url: details.cloudinary_thumbnail_url,
+              thumbnail_url: details.thumbnail_url,
+              thumbnail_source_url: details.thumbnail_source_url,
+              thumbnail_status: details.thumbnail_status,
+            },
+          });
+          updatedCount++;
+        }
+      }
+    }
+
+    revalidatePath("/");
+    revalidatePath("/admin/instagram");
+    return { success: true, count: updatedCount };
+  } catch (error: any) {
+    console.error("refreshAllInstagramThumbnails error:", error);
+    return { error: error?.message || "Failed to refresh Instagram thumbnails." };
   }
 }
 

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Clock3, MapPin, UsersRound, CalendarDays, ArrowRight, Loader2 } from "lucide-react";
 import { formatPrice, formatDate } from "@/lib/utils";
-import { getSafeImageUrl } from "@/lib/images";
+import { TravelImage } from "./TravelImage";
+import { sanitizePlaceName } from "@/lib/images";
 
 export interface PackageCardProps {
   id: string;
@@ -41,12 +41,14 @@ export function PackageCard({
   destination,
   batches,
 }: PackageCardProps) {
-  const [imgError, setImgError] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   const nextBatch = batches && batches.length > 0 ? batches[0] : null;
-  const safeImg = imgError ? "/images/logo/logoblack.png" : getSafeImageUrl(coverImage);
+
+  const cleanTitle = sanitizePlaceName(title);
+  const cleanDestination = destination?.name ? sanitizePlaceName(destination.name) : "";
+  const cleanBoarding = departureLocation ? sanitizePlaceName(departureLocation) : "Kochi / Kerala";
 
   const handleNavigate = () => {
     startTransition(() => {
@@ -55,25 +57,24 @@ export function PackageCard({
   };
 
   return (
-    <div className="group bg-white rounded-[18px] border border-[#E7ECF3] overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col h-full hover:-translate-y-1 w-full max-w-full min-w-0">
+    <div className="group bg-white rounded-[18px] border border-[#E7ECF3] overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col h-full md:hover:-translate-y-1 w-full max-w-full min-w-0">
       {/* 16:10 Aspect Ratio Image Container */}
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-gray-100 min-w-0 shrink-0">
-        <Image
-          src={safeImg}
-          alt={title || "Tour Package"}
-          fill
+        <TravelImage
+          src={coverImage}
+          alt={cleanTitle}
+          variant="medium"
           sizes="(max-width: 480px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          className="object-cover object-center group-hover:scale-105 transition-transform duration-500 pointer-events-none"
-          onError={() => setImgError(true)}
+          className="object-cover object-center md:group-hover:scale-105 transition-transform duration-500 pointer-events-none"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#050A24]/75 via-transparent to-transparent opacity-85 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050A24]/75 via-transparent to-transparent opacity-85 pointer-events-none z-10" />
 
         {/* Compact Overlay Badges */}
-        <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1 min-w-0">
-          {destination?.name && (
+        <div className="absolute bottom-2.5 left-2.5 right-2.5 z-20 flex items-center justify-between gap-1 min-w-0">
+          {cleanDestination && (
             <div className="flex items-center gap-1 bg-[#050A24]/80 border border-white/14 backdrop-blur-md px-2.5 h-[25px] rounded-[8px] text-[10px] sm:text-xs font-semibold text-white min-w-0 truncate">
               <MapPin className="w-3 h-3 text-[#3478F6] shrink-0" />
-              <span className="truncate">{destination.name}</span>
+              <span className="truncate">{cleanDestination}</span>
             </div>
           )}
           <div className="flex items-center gap-1 bg-[#050A24]/80 border border-white/14 backdrop-blur-md px-2.5 h-[25px] rounded-[8px] text-[10px] sm:text-xs font-semibold text-white shrink-0">
@@ -83,17 +84,15 @@ export function PackageCard({
         </div>
       </div>
 
-      {/* Content Area - 14px to 16px Padding */}
+      {/* Content Area */}
       <div className="p-3.5 sm:p-4 flex flex-col flex-1 justify-between space-y-3 min-w-0">
         <div className="space-y-1.5 min-w-0">
-          {/* Title: 16px-18px font-size, 2 lines max */}
           <h3 className="font-bold text-base sm:text-[17px] text-[#050A24] group-hover:text-[#3478F6] transition-colors leading-[1.25] line-clamp-2 min-h-[2.5em] overflow-hidden break-words">
-            {title}
+            {cleanTitle}
           </h3>
 
-          {/* Description: 12px-13px font-size, 2 lines max */}
           <p className="text-xs sm:text-[13px] text-[#667085] leading-[1.4] line-clamp-2 min-h-[2.8em] overflow-hidden break-words">
-            {shortDescription || title}
+            {shortDescription || cleanTitle}
           </p>
         </div>
 
@@ -102,7 +101,7 @@ export function PackageCard({
           <MapPin className="w-3.5 h-3.5 text-[#3478F6] shrink-0" />
           <span className="shrink-0">Boarding:</span>
           <span className="font-semibold text-[#0B1026] truncate min-w-0">
-            {departureLocation || "Kochi / Kerala"}
+            {cleanBoarding}
           </span>
         </div>
 

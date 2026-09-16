@@ -32,14 +32,21 @@ function formatReviewDate(dateInput?: string | Date | null): string {
 }
 
 export function TestimonialSlider({ testimonials }: TestimonialSliderProps) {
-  if (!testimonials || testimonials.length === 0) return null;
+  const canLoop = testimonials.length >= 6;
 
   return (
     <div className="relative w-full">
       <Swiper
         modules={[Autoplay, Pagination]}
-        autoplay={{ delay: 6000, disableOnInteraction: false }}
-        pagination={{ clickable: true }}
+        autoplay={
+          canLoop
+            ? { delay: 6000, disableOnInteraction: false }
+            : false
+        }
+        pagination={testimonials.length > 1 ? { clickable: true } : false}
+        loop={canLoop}
+        rewind={!canLoop && testimonials.length > 1}
+        watchOverflow={true}
         breakpoints={{
           320: { slidesPerView: 1, spaceBetween: 16 },
           768: { slidesPerView: 2, spaceBetween: 20 },
