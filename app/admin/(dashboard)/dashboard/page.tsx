@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import { updateReviewStatus, getArchiveStatusSummary } from "@/actions";
 import { ArchiveWarningBanner } from "@/components/admin/ArchiveWarningBanner";
@@ -36,6 +36,7 @@ export default async function AdminDashboardPage() {
     recentEnquiries,
     pendingReviews,
     archiveSummary,
+    paymentBookings,
   ] = await Promise.all([
     db.package.count(),
     db.package.count({ where: { status: "PUBLISHED" } }),
@@ -61,7 +62,21 @@ export default async function AdminDashboardPage() {
       orderBy: { createdAt: "desc" },
     }),
     getArchiveStatusSummary(),
+    db.booking.findMany(),
   ]);
+
+  const collectionTotals = (paymentBookings || []).reduce(
+    (totals: { rishal: number; nihas: number; unassigned: number }, booking: any) => {
+      (Array.isArray(booking.payments) ? booking.payments : []).forEach((payment: any) => {
+        const amount = Number(payment.amount) || 0;
+        if (payment.receivedBy === "Rishal") totals.rishal += amount;
+        else if (payment.receivedBy === "Nihas") totals.nihas += amount;
+        else totals.unassigned += amount;
+      });
+      return totals;
+    },
+    { rishal: 0, nihas: 0, unassigned: 0 }
+  );
 
   const statCards = [
     { label: "Total Packages", value: totalPackages, sub: `${publishedPackages} Published`, icon: Package, href: "/admin/packages" },
@@ -110,6 +125,25 @@ export default async function AdminDashboardPage() {
           );
         })}
       </div>
+
+      {/* Payment Collection Split */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-blue-50/80 rounded-2xl p-5 border border-blue-200 shadow-sm">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-600 block">Rishal Collected</span>
+          <div className="text-3xl font-black text-blue-700 mt-1">{formatPrice(collectionTotals.rishal)}</div>
+          <span className="text-[11px] text-blue-500 font-semibold block mt-1">All recorded payments</span>
+        </div>
+        <div className="bg-violet-50/80 rounded-2xl p-5 border border-violet-200 shadow-sm">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-violet-600 block">Nihas Collected</span>
+          <div className="text-3xl font-black text-violet-700 mt-1">{formatPrice(collectionTotals.nihas)}</div>
+          <span className="text-[11px] text-violet-500 font-semibold block mt-1">All recorded payments</span>
+        </div>
+      </div>
+      {collectionTotals.unassigned > 0 && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-2xl px-4 py-3 text-xs font-semibold">
+          Older payments not assigned to Rishal or Nihas: {formatPrice(collectionTotals.unassigned)}
+        </div>
+      )}
 
       {/* Pending Moderation Reviews Section */}
       {pendingReviews.length > 0 && (
