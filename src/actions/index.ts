@@ -685,6 +685,7 @@ export interface BookingInputData {
   totalAmount: number;
   paidAmount?: number;
   paymentMethod?: string;
+  paymentReceiver?: "Rishal" | "Nihas" | string;
   transactionId?: string;
   paymentStatus?: string;
   bookingStatus?: string;
@@ -738,6 +739,7 @@ export async function createBatchBooking(data: BookingInputData) {
     const payments = paidAmount > 0 ? [{
       amount: paidAmount,
       method: data.paymentMethod || "Cash",
+      receivedBy: data.paymentReceiver || null,
       transactionId: data.transactionId || null,
       paidAt: new Date(),
       notes: "Initial payment during booking creation",
@@ -917,7 +919,7 @@ export async function updateBatchBooking(id: string, data: Partial<BookingInputD
 
 export async function addPaymentToBooking(
   bookingId: string,
-  paymentData: { amount: number; method: string; transactionId?: string; notes?: string }
+  paymentData: { amount: number; method: string; receivedBy?: "Rishal" | "Nihas" | string; transactionId?: string; notes?: string }
 ) {
   const session = await getAdminSession();
   if (!session) return { error: "Unauthorized" };
@@ -929,6 +931,7 @@ export async function addPaymentToBooking(
     const newPayment = {
       amount: Number(paymentData.amount) || 0,
       method: paymentData.method || "Cash",
+      receivedBy: paymentData.receivedBy || null,
       transactionId: paymentData.transactionId || null,
       paidAt: new Date(),
       notes: paymentData.notes || null,
