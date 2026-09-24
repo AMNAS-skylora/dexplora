@@ -87,7 +87,7 @@ interface BookingRecord {
   busOperator?: string | null;
   checkInStatus?: string | null;
   notes?: string | null;
-  payments?: Array<{ amount: number; method: string; transactionId?: string | null; paidAt: string | Date; notes?: string | null }>;
+  payments?: Array<{ amount: number; method: string; receivedBy?: string | null; transactionId?: string | null; paidAt: string | Date; notes?: string | null }>;
   createdAt?: string | Date;
 }
 
@@ -151,6 +151,7 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
   const [totalAmount, setTotalAmount] = useState<number>(batch.priceOverride || batch.packagePrice || 14499);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState("UPI");
+  const [paymentReceiver, setPaymentReceiver] = useState<"Rishal" | "Nihas">("Rishal");
   const [transactionId, setTransactionId] = useState("");
   const [bookingStatus, setBookingStatus] = useState("Confirmed");
   const [boardingPoint, setBoardingPoint] = useState(batch.departurePoint || "Kochi");
@@ -170,6 +171,7 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
   // Payment Add Modal State
   const [newPayAmount, setNewPayAmount] = useState<number>(0);
   const [newPayMethod, setNewPayMethod] = useState("UPI");
+  const [newPayReceiver, setNewPayReceiver] = useState<"Rishal" | "Nihas">("Rishal");
   const [newPayTxnId, setNewPayTxnId] = useState("");
   const [newPayNotes, setNewPayNotes] = useState("");
 
@@ -199,6 +201,18 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
   const totalBookedSeats = confirmedBookings.reduce((sum, b) => sum + (b.travellerCount || 1), 0);
   const totalRevenue = confirmedBookings.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
   const totalCollected = confirmedBookings.reduce((sum, b) => sum + (Number(b.paidAmount) || 0), 0);
+  const receiverTotals = confirmedBookings.reduce(
+    (totals, booking) => {
+      (booking.payments || []).forEach((payment) => {
+        const amount = Number(payment.amount) || 0;
+        if (payment.receivedBy === "Rishal") totals.rishal += amount;
+        else if (payment.receivedBy === "Nihas") totals.nihas += amount;
+        else totals.unassigned += amount;
+      });
+      return totals;
+    },
+    { rishal: 0, nihas: 0, unassigned: 0 }
+  );
   const totalPending = Math.max(0, totalRevenue - totalCollected);
   const availableSeats = Math.max(0, batch.totalSeats - totalBookedSeats);
 
@@ -220,6 +234,7 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
     setTotalAmount(batch.priceOverride || batch.packagePrice || 14499);
     setPaidAmount(0);
     setPaymentMethod("UPI");
+    setPaymentReceiver("Rishal");
     setTransactionId("");
     setBookingStatus("Confirmed");
     setBoardingPoint(batch.departurePoint || "Kochi");
@@ -304,6 +319,7 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
       totalAmount: Number(totalAmount) || 0,
       paidAmount: Number(paidAmount) || 0,
       paymentMethod,
+      paymentReceiver,
       transactionId: transactionId.trim() || undefined,
       bookingStatus,
       boardingPoint: boardingPoint.trim() || undefined,
@@ -349,6 +365,7 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
     const res = await addPaymentToBooking(paymentModalBooking.id, {
       amount: Number(newPayAmount),
       method: newPayMethod,
+      receivedBy: newPayReceiver,
       transactionId: newPayTxnId.trim() || undefined,
       notes: newPayNotes.trim() || undefined,
     });
@@ -359,6 +376,7 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
     } else {
       setPaymentModalBooking(null);
       setNewPayAmount(0);
+      setNewPayReceiver("Rishal");
       setNewPayTxnId("");
       setNewPayNotes("");
     }
@@ -551,6 +569,25 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
           </p>
         </div>
       </div>
+
+      {/* Collection Split */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="rounded-3xl p-5 border border-blue-200 bg-blue-50/70 shadow-sm">
+          <div className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700">Rishal Collected</div>
+          <div className="text-2xl font-black text-blue-700 mt-1">{formatPrice(receiverTotals.rishal)}</div>
+          <div className="text-[11px] font-semibold text-blue-500 mt-1">Payments received by Rishal</div>
+        </div>
+        <div className="rounded-3xl p-5 border border-violet-200 bg-violet-50/70 shadow-sm">
+          <div className="text-[11px] font-extrabold uppercase tracking-wider text-violet-700">Nihas Collected</div>
+          <div className="text-2xl font-black text-violet-700 mt-1">{formatPrice(receiverTotals.nihas)}</div>
+          <div className="text-[11px] font-semibold text-violet-500 mt-1">Payments received by Nihas</div>
+        </div>
+      </div>
+      {receiverTotals.unassigned > 0 && (
+        <div className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+          Older payments without receiver assignment: {formatPrice(receiverTotals.unassigned)}
+        </div>
+      )}
 
       {/* Participant Manifest Controls */}
       <div className="bg-white rounded-3xl p-4 sm:p-5 border border-[#E8ECF3] shadow-sm space-y-4">
@@ -1020,6 +1057,14 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
+                    <label className="block text-[11px] font-bold text-[#0B1026] mb-1">Received By</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => setPaymentReceiver("Rishal")} className={`rounded-xl px-3 py-2 text-[11px] font-extrabold border transition-all ${paymentReceiver === "Rishal" ? "bg-blue-600 text-white border-blue-600" : "bg-blue-50 text-blue-700 border-blue-200"}`}>Rishal</button>
+                      <button type="button" onClick={() => setPaymentReceiver("Nihas")} className={`rounded-xl px-3 py-2 text-[11px] font-extrabold border transition-all ${paymentReceiver === "Nihas" ? "bg-violet-600 text-white border-violet-600" : "bg-violet-50 text-violet-700 border-violet-200"}`}>Nihas</button>
+                    </div>
+                  </div>
+
+                  <div>
                     <label className="block text-[11px] font-bold text-[#0B1026] mb-1">Payment Method</label>
                     <select
                       value={paymentMethod}
@@ -1236,6 +1281,14 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
                   placeholder={String(paymentModalBooking.balanceAmount)}
                   className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2 text-xs font-bold text-emerald-600 outline-none focus:border-[#3478F6]"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0B1026] mb-1">Received By *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setNewPayReceiver("Rishal")} className={`rounded-xl px-3 py-2.5 text-xs font-extrabold border transition-all ${newPayReceiver === "Rishal" ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-blue-50 text-blue-700 border-blue-200"}`}>Rishal</button>
+                  <button type="button" onClick={() => setNewPayReceiver("Nihas")} className={`rounded-xl px-3 py-2.5 text-xs font-extrabold border transition-all ${newPayReceiver === "Nihas" ? "bg-violet-600 text-white border-violet-600 shadow-sm" : "bg-violet-50 text-violet-700 border-violet-200"}`}>Nihas</button>
+                </div>
               </div>
 
               <div>
