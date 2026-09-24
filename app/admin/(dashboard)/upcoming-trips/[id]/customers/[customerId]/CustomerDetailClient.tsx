@@ -87,7 +87,7 @@ interface CustomerBookingDetails {
   busOperator?: string | null;
   checkInStatus?: string | null;
   notes?: string | null;
-  payments?: Array<{ amount: number; method: string; transactionId?: string | null; paidAt: string | Date; notes?: string | null }>;
+  payments?: Array<{ amount: number; method: string; receivedBy?: string | null; transactionId?: string | null; paidAt: string | Date; notes?: string | null }>;
   travellers?: Array<{ id: string; name: string; age?: number | null; gender?: string | null; phone?: string | null; boardingPoint?: string | null; transportType?: string | null; seatNumber?: string | null; checkInStatus?: string | null }>;
   createdAt?: string | Date;
 }
@@ -107,6 +107,7 @@ export function CustomerDetailClient({ event, customer }: CustomerDetailClientPr
   // Payment Form State
   const [payAmount, setPayAmount] = useState<number>(customer.balanceAmount || 0);
   const [payMethod, setPayMethod] = useState("UPI");
+  const [payReceiver, setPayReceiver] = useState<"Rishal" | "Nihas">("Rishal");
   const [payTxnId, setPayTxnId] = useState("");
   const [payNotes, setPayNotes] = useState("");
 
@@ -133,6 +134,7 @@ export function CustomerDetailClient({ event, customer }: CustomerDetailClientPr
     const res = await addPaymentToBooking(customer.id, {
       amount: Number(payAmount),
       method: payMethod,
+      receivedBy: payReceiver,
       transactionId: payTxnId.trim() || undefined,
       notes: payNotes.trim() || undefined,
     });
@@ -142,6 +144,7 @@ export function CustomerDetailClient({ event, customer }: CustomerDetailClientPr
       setError(res.error);
     } else {
       setIsPaymentModalOpen(false);
+      setPayReceiver("Rishal");
       setPayTxnId("");
       setPayNotes("");
     }
@@ -334,6 +337,16 @@ export function CustomerDetailClient({ event, customer }: CustomerDetailClientPr
                 <span className="text-gray-500 font-medium">Amount Paid:</span>
                 <span className="font-extrabold text-emerald-600 text-sm">{formatPrice(customer.paidAmount)}</span>
               </div>
+              <div className="grid grid-cols-2 gap-2 py-1">
+                <div className="rounded-xl bg-blue-50 border border-blue-100 px-2.5 py-2">
+                  <div className="text-[9px] uppercase font-extrabold text-blue-500">Rishal</div>
+                  <div className="text-xs font-black text-blue-700">{formatPrice((customer.payments || []).filter((p) => p.receivedBy === "Rishal").reduce((sum, p) => sum + (Number(p.amount) || 0), 0))}</div>
+                </div>
+                <div className="rounded-xl bg-violet-50 border border-violet-100 px-2.5 py-2">
+                  <div className="text-[9px] uppercase font-extrabold text-violet-500">Nihas</div>
+                  <div className="text-xs font-black text-violet-700">{formatPrice((customer.payments || []).filter((p) => p.receivedBy === "Nihas").reduce((sum, p) => sum + (Number(p.amount) || 0), 0))}</div>
+                </div>
+              </div>
               <div className="flex justify-between py-1">
                 <span className="text-gray-500 font-bold">Remaining Due:</span>
                 <span className="font-extrabold text-red-600 text-base">{formatPrice(customer.balanceAmount)}</span>
@@ -371,6 +384,11 @@ export function CustomerDetailClient({ event, customer }: CustomerDetailClientPr
                     <span className="bg-white px-2 py-0.5 rounded-lg border font-bold text-[#0B1026] text-[10px]">
                       {p.method}
                     </span>
+                    {p.receivedBy && (
+                      <span className={`px-2 py-0.5 rounded-lg border font-extrabold text-[10px] ${p.receivedBy === "Rishal" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-violet-50 text-violet-700 border-violet-200"}`}>
+                        {p.receivedBy}
+                      </span>
+                    )}
                   </div>
                   {p.transactionId && <p className="text-gray-500 font-mono text-[11px]">Txn Ref: {p.transactionId}</p>}
                 </div>
@@ -467,6 +485,14 @@ export function CustomerDetailClient({ event, customer }: CustomerDetailClientPr
                   required
                   className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2 text-xs font-bold text-emerald-600 outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0B1026] mb-1">Received By *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setPayReceiver("Rishal")} className={`rounded-xl px-3 py-2.5 text-xs font-extrabold border transition-all ${payReceiver === "Rishal" ? "bg-blue-600 text-white border-blue-600 shadow-sm" : "bg-blue-50 text-blue-700 border-blue-200"}`}>Rishal</button>
+                  <button type="button" onClick={() => setPayReceiver("Nihas")} className={`rounded-xl px-3 py-2.5 text-xs font-extrabold border transition-all ${payReceiver === "Nihas" ? "bg-violet-600 text-white border-violet-600 shadow-sm" : "bg-violet-50 text-violet-700 border-violet-200"}`}>Nihas</button>
+                </div>
               </div>
 
               <div>
