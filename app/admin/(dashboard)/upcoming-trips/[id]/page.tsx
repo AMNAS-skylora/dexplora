@@ -11,7 +11,7 @@ interface PageProps {
 export default async function AdminEventDetailsPage({ params }: PageProps) {
   const { id } = await params;
 
-  const [batch, packages] = await Promise.all([
+  const [batch, packages, eventExpenses] = await Promise.all([
     db.tripBatch.findUnique({
       where: { id },
       include: { package: true, bookings: true },
@@ -19,6 +19,10 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
     db.package.findMany({
       where: { status: "PUBLISHED" },
       select: { id: true, title: true, price: true, duration: true },
+    }),
+    db.expense.findMany({
+      where: { tripBatchId: id },
+      orderBy: { expenseDate: "desc" },
     }),
   ]);
 
@@ -35,6 +39,8 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
     packageTitle: pkg.title || "Package not set",
     packageCoverImage: pkg.coverImage || "/placeholder.jpg",
     packagePrice: pkg.price || 0,
+    packageExpensePerPerson: Number(pkg.expensePerPerson) || 0,
+    eventExpenses: Array.isArray(eventExpenses) ? eventExpenses : [],
     duration: pkg.duration || "N/A",
     departurePoint: batch.boardingPoint || pkg.departureLocation || "Kerala",
     arrivalDestination: batch.arrivalDestination || pkg.arrivalLocation || "Destination",
