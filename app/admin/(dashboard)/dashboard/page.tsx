@@ -37,6 +37,8 @@ export default async function AdminDashboardPage() {
     pendingReviews,
     archiveSummary,
     paymentBookings,
+    financePackages,
+    expenseLedger,
   ] = await Promise.all([
     db.package.count(),
     db.package.count({ where: { status: "PUBLISHED" } }),
@@ -63,7 +65,32 @@ export default async function AdminDashboardPage() {
     }),
     getArchiveStatusSummary(),
     db.booking.findMany(),
+    db.package.findMany(),
+    db.expense.findMany(),
   ]);
+
+  const packageExpenseMap = new Map(
+    (financePackages || []).map((pkg: any) => [pkg.id, Number(pkg.expensePerPerson) || 0])
+  );
+
+  const activeFinanceBookings = (paymentBookings || []).filter((booking: any) => {
+    const status = String(booking.bookingStatus || booking.status || "").toUpperCase();
+    return status !== "CANCELLED";
+  });
+  const totalFinanceRevenue = activeFinanceBookings.reduce(
+    (sum: number, booking: any) => sum + (Number(booking.totalAmount) || 0),
+    0
+  );
+  const totalBaseExpense = activeFinanceBookings.reduce((sum: number, booking: any) => {
+    const travellers = Number(booking.travellerCount) || 1;
+    return sum + (packageExpenseMap.get(booking.packageId) || 0) * travellers;
+  }, 0);
+  const totalExtraExpense = (expenseLedger || []).reduce(
+    (sum: number, expense: any) => sum + (Number(expense.amount) || 0),
+    0
+  );
+  const totalFinanceExpense = totalBaseExpense + totalExtraExpense;
+  const totalFinanceProfit = totalFinanceRevenue - totalFinanceExpense;
 
   const collectionTotals = (paymentBookings || []).reduce(
     (totals: { rishal: number; nihas: number; unassigned: number }, booking: any) => {
@@ -124,6 +151,25 @@ export default async function AdminDashboardPage() {
             </Link>
           );
         })}
+      </div>
+
+      {/* Finance Overview */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Link href="/admin/expenses" className="bg-emerald-50/80 rounded-2xl p-5 border border-emerald-200 shadow-sm hover:shadow-md transition-all">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-600 block">Total Revenue</span>
+          <div className="text-3xl font-black text-emerald-700 mt-1">{formatPrice(totalFinanceRevenue)}</div>
+          <span className="text-[11px] text-emerald-600 font-semibold block mt-1">Confirmed booking value</span>
+        </Link>
+        <Link href="/admin/expenses" className="bg-amber-50/80 rounded-2xl p-5 border border-amber-200 shadow-sm hover:shadow-md transition-all">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-600 block">Total Expense</span>
+          <div className="text-3xl font-black text-amber-700 mt-1">{formatPrice(totalFinanceExpense)}</div>
+          <span className="text-[11px] text-amber-600 font-semibold block mt-1">Base + extra expenses</span>
+        </Link>
+        <Link href="/admin/expenses" className={`rounded-2xl p-5 border shadow-sm hover:shadow-md transition-all ${totalFinanceProfit >= 0 ? "bg-blue-50/80 border-blue-200" : "bg-red-50/80 border-red-200"}`}>
+          <span className={`text-[11px] font-extrabold uppercase tracking-wider block ${totalFinanceProfit >= 0 ? "text-blue-600" : "text-red-600"}`}>Estimated Profit</span>
+          <div className={`text-3xl font-black mt-1 ${totalFinanceProfit >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatPrice(totalFinanceProfit)}</div>
+          <span className="text-[11px] text-gray-500 font-semibold block mt-1">Revenue − all expenses</span>
+        </Link>
       </div>
 
       {/* Payment Collection Split */}
