@@ -16,6 +16,7 @@ import {
   Mail,
   Archive,
   Settings,
+  WalletCards,
   LogOut,
   X,
 } from "lucide-react";
@@ -50,6 +51,7 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Packages", href: "/admin/packages", icon: Package },
     { name: "Upcoming Trips", href: "/admin/upcoming-trips", icon: Calendar },
+    { name: "Expenses", href: "/admin/expenses", icon: WalletCards },
     { name: "Destinations", href: "/admin/destinations", icon: MapPin },
     { name: "Hero Slides", href: "/admin/hero-slides", icon: Sliders },
     { name: "Instagram Feed", href: "/admin/instagram", icon: InstagramIcon },
