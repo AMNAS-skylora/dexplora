@@ -22,6 +22,7 @@ export interface PackageInitialData {
   duration?: string;
   price?: number;
   originalPrice?: number | null;
+  expensePerPerson?: number;
   departureLocation?: string;
   arrivalLocation?: string;
   accommodation?: string;
@@ -234,6 +235,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       duration: generatedDuration,
       price: Number(formData.get("price")),
       originalPrice: formData.get("originalPrice") ? Number(formData.get("originalPrice")) : null,
+      expensePerPerson: Math.max(0, Number(formData.get("expensePerPerson")) || 0),
       departureLocation: (formData.get("departureLocation") as string) || "Kerala",
       arrivalLocation: formData.get("arrivalLocation") as string,
       accommodation: (formData.get("accommodation") as string) || "3-Star Hotel & Resort",
@@ -503,8 +505,8 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       <div className="bg-white rounded-3xl p-6 border border-[#E8ECF3] shadow-sm space-y-5">
         <h3 className="font-extrabold text-base text-[#0B1026]">2. Pricing & Key Logistics</h3>
 
-        {/* Row 1: Selling Price, Original Price, Days, Nights */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Row 1: Selling Price, Base Expense, Original Price, Days, Nights */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div>
             <label className="block text-xs font-bold text-[#0B1026] mb-1">Selling Price (₹) *</label>
             <input
@@ -515,6 +517,19 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
               placeholder="14499"
               className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#3478F6] focus:outline-none focus:border-[#3478F6] min-h-[44px]"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#0B1026] mb-1">Expense / Person (₹)</label>
+            <input
+              type="number"
+              name="expensePerPerson"
+              min="0"
+              defaultValue={initialData?.expensePerPerson ?? 0}
+              placeholder="0"
+              className="w-full bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-amber-800 focus:outline-none focus:border-amber-500 min-h-[44px]"
+            />
+            <p className="text-[10px] text-gray-500 mt-1">Auto multiplies by confirmed travellers.</p>
           </div>
 
           <div>
