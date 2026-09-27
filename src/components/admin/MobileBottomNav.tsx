@@ -16,6 +16,7 @@ import {
   BookmarkCheck,
   Mail,
   Settings,
+  WalletCards,
   LogOut,
   X,
   ExternalLink,
@@ -52,6 +53,7 @@ export function MobileBottomNav() {
   ];
 
   const moreLinks = [
+    { name: "Expenses", href: "/admin/expenses", icon: WalletCards },
     { name: "Destinations", href: "/admin/destinations", icon: MapPin },
     { name: "Hero Slides", href: "/admin/hero-slides", icon: Sliders },
     { name: "Instagram Feed", href: "/admin/instagram", icon: InstagramIcon },
