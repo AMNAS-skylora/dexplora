@@ -244,6 +244,7 @@ export interface PackageInputData {
   duration: string;
   price: number;
   originalPrice?: number | null;
+  expensePerPerson?: number;
   departureLocation: string;
   arrivalLocation: string;
   accommodation: string;
@@ -399,6 +400,8 @@ export async function createPackage(data: PackageInputData) {
         duration: data.duration,
         price: Number(data.price),
         originalPrice: data.originalPrice ? Number(data.originalPrice) : null,
+        expensePerPerson: Math.max(0, Number(data.expensePerPerson) || 0),
+        expensePerPerson: Math.max(0, Number(data.expensePerPerson) || 0),
         departureLocation: data.departureLocation,
         arrivalLocation: data.arrivalLocation,
         accommodation: data.accommodation,
@@ -2026,3 +2029,70 @@ export async function updateArchiveSettingsAction(data: {
 
 
 
+
+
+// ================= FINANCE / EXPENSE ACTIONS =================
+export interface ExpenseInputData {
+  title: string;
+  amount: number;
+  category?: string;
+  tripBatchId?: string | null;
+  packageId?: string | null;
+  expenseDate?: string | Date;
+  notes?: string;
+}
+
+export async function addExpense(data: ExpenseInputData) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const amount = Math.max(0, Number(data.amount) || 0);
+    if (!data.title?.trim()) return { error: "Expense title is required." };
+    if (amount <= 0) return { error: "Expense amount must be greater than 0." };
+
+    let packageId = data.packageId || null;
+    if (data.tripBatchId && !packageId) {
+      const batch = await db.tripBatch.findUnique({ where: { id: data.tripBatchId } });
+      packageId = batch?.packageId || null;
+    }
+
+    const expense = await db.expense.create({
+      data: {
+        title: data.title.trim(),
+        amount,
+        category: data.category || "Miscellaneous",
+        tripBatchId: data.tripBatchId || null,
+        packageId,
+        expenseDate: data.expenseDate ? new Date(data.expenseDate) : new Date(),
+        notes: data.notes?.trim() || null,
+        createdBy: session.email || "Admin",
+      },
+    });
+
+    revalidatePath("/admin/expenses");
+    revalidatePath("/admin/dashboard");
+    if (data.tripBatchId) revalidatePath(`/admin/upcoming-trips/${data.tripBatchId}`);
+    return { success: true, expense };
+  } catch (error: any) {
+    console.error("Add expense error:", error);
+    return { error: error?.message || "Failed to add expense." };
+  }
+}
+
+export async function deleteExpense(id: string) {
+  const session = await getAdminSession();
+  if (!session) return { error: "Unauthorized" };
+
+  try {
+    const existing = await db.expense.findUnique({ where: { id } });
+    if (!existing) return { error: "Expense not found." };
+    await db.expense.delete({ where: { id } });
+    revalidatePath("/admin/expenses");
+    revalidatePath("/admin/dashboard");
+    if (existing.tripBatchId) revalidatePath(`/admin/upcoming-trips/${existing.tripBatchId}`);
+    return { success: true };
+  } catch (error: any) {
+    return { error: error?.message || "Failed to delete expense." };
+  }
+}
