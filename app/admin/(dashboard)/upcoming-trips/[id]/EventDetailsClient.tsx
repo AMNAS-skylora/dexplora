@@ -107,6 +107,8 @@ interface EnrichedBatchDetails {
   packageTitle: string;
   packageCoverImage: string;
   packagePrice: number;
+  packageExpensePerPerson: number;
+  eventExpenses?: Array<{ id: string; title: string; amount: number; category?: string | null; expenseDate?: string | Date; notes?: string | null }>;
   duration: string;
   departurePoint: string;
   arrivalDestination: string;
@@ -213,6 +215,10 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
     },
     { rishal: 0, nihas: 0, unassigned: 0 }
   );
+  const baseExpense = (Number(batch.packageExpensePerPerson) || 0) * totalBookedSeats;
+  const extraExpense = (batch.eventExpenses || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const totalExpense = baseExpense + extraExpense;
+  const estimatedProfit = totalRevenue - totalExpense;
   const totalPending = Math.max(0, totalRevenue - totalCollected);
   const availableSeats = Math.max(0, batch.totalSeats - totalBookedSeats);
 
@@ -569,6 +575,49 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
           </p>
         </div>
       </div>
+
+      {/* Event Finance Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="rounded-3xl p-5 border border-emerald-200 bg-emerald-50/70 shadow-sm">
+          <div className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700">Revenue</div>
+          <div className="text-2xl font-black text-emerald-700 mt-1">{formatPrice(totalRevenue)}</div>
+          <div className="text-[11px] font-semibold text-emerald-600 mt-1">{totalBookedSeats} confirmed travellers</div>
+        </div>
+        <div className="rounded-3xl p-5 border border-amber-200 bg-amber-50/70 shadow-sm">
+          <div className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700">Total Expense</div>
+          <div className="text-2xl font-black text-amber-700 mt-1">{formatPrice(totalExpense)}</div>
+          <div className="text-[11px] font-semibold text-amber-600 mt-1">
+            Base {formatPrice(baseExpense)} + Extra {formatPrice(extraExpense)}
+          </div>
+        </div>
+        <div className={`rounded-3xl p-5 border shadow-sm ${estimatedProfit >= 0 ? "border-blue-200 bg-blue-50/70" : "border-red-200 bg-red-50/70"}`}>
+          <div className={`text-[11px] font-extrabold uppercase tracking-wider ${estimatedProfit >= 0 ? "text-blue-700" : "text-red-700"}`}>Estimated Profit</div>
+          <div className={`text-2xl font-black mt-1 ${estimatedProfit >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatPrice(estimatedProfit)}</div>
+          <div className="text-[11px] font-semibold text-gray-500 mt-1">
+            Package cost/person: {formatPrice(batch.packageExpensePerPerson || 0)}
+          </div>
+        </div>
+      </div>
+
+      {(batch.eventExpenses || []).length > 0 && (
+        <div className="bg-white rounded-3xl border border-[#E8ECF3] p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="font-extrabold text-sm text-[#0B1026]">Event Extra Expenses</h3>
+            <Link href="/admin/expenses" className="text-[11px] font-bold text-[#3478F6] hover:underline">Manage Expenses</Link>
+          </div>
+          <div className="space-y-2">
+            {(batch.eventExpenses || []).slice(0, 5).map((expense) => (
+              <div key={expense.id} className="flex items-center justify-between gap-3 rounded-xl bg-[#F8FAFC] border border-[#E8ECF3] px-3 py-2 text-xs">
+                <div>
+                  <div className="font-bold text-[#0B1026]">{expense.title}</div>
+                  <div className="text-[10px] text-gray-500">{expense.category || "Miscellaneous"}</div>
+                </div>
+                <div className="font-extrabold text-amber-700">{formatPrice(expense.amount)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Collection Split */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
