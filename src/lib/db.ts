@@ -698,6 +698,7 @@ export const db: Record<string, any> = {
   aboutContent: createCollectionWrapper("AboutContent"),
   instagramPost: createCollectionWrapper("InstagramPost"),
   archiveAuditLog: createCollectionWrapper("ArchiveAuditLog"),
+  expense: createCollectionWrapper("Expense"),
 };
 
 export default db;
