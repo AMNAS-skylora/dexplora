@@ -69,8 +69,11 @@ export default async function AdminDashboardPage() {
     db.expense.findMany(),
   ]);
 
-  const packageExpenseMap = new Map(
-    (financePackages || []).map((pkg: any) => [pkg.id, Number(pkg.expensePerPerson) || 0])
+  const packageExpenseMap = new Map<string, number>(
+    (financePackages || []).map((pkg: any): [string, number] => [
+      String(pkg.id),
+      Number(pkg.expensePerPerson) || 0,
+    ])
   );
 
   const activeFinanceBookings = (paymentBookings || []).filter((booking: any) => {
