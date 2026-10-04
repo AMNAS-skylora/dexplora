@@ -401,7 +401,6 @@ export async function createPackage(data: PackageInputData) {
         price: Number(data.price),
         originalPrice: data.originalPrice ? Number(data.originalPrice) : null,
         expensePerPerson: Math.max(0, Number(data.expensePerPerson) || 0),
-        expensePerPerson: Math.max(0, Number(data.expensePerPerson) || 0),
         departureLocation: data.departureLocation,
         arrivalLocation: data.arrivalLocation,
         accommodation: data.accommodation,
