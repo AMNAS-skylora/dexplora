@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
-import { updateContactStatus, deleteContact } from "@/actions";
+import { deleteContact } from "@/actions";
 import { Trash2 } from "lucide-react";
+import { ContactStatusSelect } from "./ContactStatusSelect";
 
 export const revalidate = 0;
 
@@ -46,23 +47,11 @@ export default async function AdminEnquiriesPage() {
                       <td className="py-4 text-gray-700 max-w-xs truncate">{e.message}</td>
                       <td className="py-4 text-gray-500">{formatDate(e.createdAt)}</td>
                       <td className="py-4">
-                        <form action={async (formData: FormData) => {
-                          "use server";
-                          await updateContactStatus(e.id, formData.get("status") as any);
-                        }}>
-                          <select
-                            name="status"
-                            defaultValue={e.status}
-                            onChange={(evt) => evt.target.form?.requestSubmit()}
-                            className="bg-[#F3F7FF] border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1"
-                          >
-                            <option value="NEW">NEW</option>
-                            <option value="READ">READ</option>
-                            <option value="REPLIED">REPLIED</option>
-                            <option value="RESOLVED">RESOLVED</option>
-                            <option value="SPAM">SPAM</option>
-                          </select>
-                        </form>
+                        <ContactStatusSelect
+                          id={e.id}
+                          status={e.status}
+                          className="bg-[#F3F7FF] border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1 disabled:opacity-60"
+                        />
                       </td>
                       <td className="py-4 text-right">
                         <form action={async () => { "use server"; await deleteContact(e.id); }}>
@@ -83,23 +72,11 @@ export default async function AdminEnquiriesPage() {
                 <div key={e.id} className="bg-[#F3F7FF]/50 border border-[#E8ECF3] rounded-2xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-sm text-[#0B1026]">{e.name}</h3>
-                    <form action={async (formData: FormData) => {
-                      "use server";
-                      await updateContactStatus(e.id, formData.get("status") as any);
-                    }}>
-                      <select
-                        name="status"
-                        defaultValue={e.status}
-                        onChange={(evt) => evt.target.form?.requestSubmit()}
-                        className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5"
-                      >
-                        <option value="NEW">NEW</option>
-                        <option value="READ">READ</option>
-                        <option value="REPLIED">REPLIED</option>
-                        <option value="RESOLVED">RESOLVED</option>
-                        <option value="SPAM">SPAM</option>
-                      </select>
-                    </form>
+                    <ContactStatusSelect
+                      id={e.id}
+                      status={e.status}
+                      className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5 disabled:opacity-60"
+                    />
                   </div>
 
                   <div className="text-xs space-y-0.5">
