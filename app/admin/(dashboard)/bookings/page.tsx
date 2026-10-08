@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
-import { updateBookingStatus, deleteBooking } from "@/actions";
-import { Trash2, Phone, Mail, Send } from "lucide-react";
+import { deleteBooking } from "@/actions";
+import { Trash2 } from "lucide-react";
+import { BookingStatusSelect } from "./BookingStatusSelect";
 
 export const revalidate = 0;
 
@@ -62,23 +63,11 @@ export default async function AdminBookingsPage() {
                       <td className="py-4 text-gray-600">{b.boardingLocation || "Kerala"}</td>
                       <td className="py-4 text-gray-500">{formatDate(b.createdAt)}</td>
                       <td className="py-4">
-                        <form action={async (formData: FormData) => {
-                          "use server";
-                          await updateBookingStatus(b.id, formData.get("status") as any);
-                        }}>
-                          <select
-                            name="status"
-                            defaultValue={b.status}
-                            onChange={(e) => e.target.form?.requestSubmit()}
-                            className="bg-[#F3F7FF] border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1"
-                          >
-                            <option value="NEW">NEW</option>
-                            <option value="READ">READ</option>
-                            <option value="CONTACTED">CONTACTED</option>
-                            <option value="CONFIRMED">CONFIRMED</option>
-                            <option value="CANCELLED">CANCELLED</option>
-                          </select>
-                        </form>
+                        <BookingStatusSelect
+                          id={b.id}
+                          status={b.status}
+                          className="bg-[#F3F7FF] border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1 disabled:opacity-60"
+                        />
                       </td>
                       <td className="py-4 text-right">
                         <form action={async () => { "use server"; await deleteBooking(b.id); }}>
@@ -99,23 +88,11 @@ export default async function AdminBookingsPage() {
                 <div key={b.id} className="bg-[#F3F7FF]/50 border border-[#E8ECF3] rounded-2xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="font-black text-sm text-[#3478F6]">{b.referenceCode}</span>
-                    <form action={async (formData: FormData) => {
-                      "use server";
-                      await updateBookingStatus(b.id, formData.get("status") as any);
-                    }}>
-                      <select
-                        name="status"
-                        defaultValue={b.status}
-                        onChange={(e) => e.target.form?.requestSubmit()}
-                        className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5"
-                      >
-                        <option value="NEW">NEW</option>
-                        <option value="READ">READ</option>
-                        <option value="CONTACTED">CONTACTED</option>
-                        <option value="CONFIRMED">CONFIRMED</option>
-                        <option value="CANCELLED">CANCELLED</option>
-                      </select>
-                    </form>
+                    <BookingStatusSelect
+                      id={b.id}
+                      status={b.status}
+                      className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5 disabled:opacity-60"
+                    />
                   </div>
 
                   <div>
