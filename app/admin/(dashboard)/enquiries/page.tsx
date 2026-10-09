@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { AutoSubmitStatusSelect } from "@/components/admin/AutoSubmitStatusSelect";
 import { formatDate } from "@/lib/utils";
 import { updateContactStatus, deleteContact } from "@/actions";
 import { Trash2 } from "lucide-react";
@@ -50,18 +51,11 @@ export default async function AdminEnquiriesPage() {
                           "use server";
                           await updateContactStatus(e.id, formData.get("status") as any);
                         }}>
-                          <select
-                            name="status"
+                          <AutoSubmitStatusSelect
+                            kind="contact"
                             defaultValue={e.status}
-                            onChange={(evt) => evt.target.form?.requestSubmit()}
                             className="bg-[#F3F7FF] border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1"
-                          >
-                            <option value="NEW">NEW</option>
-                            <option value="READ">READ</option>
-                            <option value="REPLIED">REPLIED</option>
-                            <option value="RESOLVED">RESOLVED</option>
-                            <option value="SPAM">SPAM</option>
-                          </select>
+                          />
                         </form>
                       </td>
                       <td className="py-4 text-right">
@@ -87,18 +81,11 @@ export default async function AdminEnquiriesPage() {
                       "use server";
                       await updateContactStatus(e.id, formData.get("status") as any);
                     }}>
-                      <select
-                        name="status"
-                        defaultValue={e.status}
-                        onChange={(evt) => evt.target.form?.requestSubmit()}
-                        className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5"
-                      >
-                        <option value="NEW">NEW</option>
-                        <option value="READ">READ</option>
-                        <option value="REPLIED">REPLIED</option>
-                        <option value="RESOLVED">RESOLVED</option>
-                        <option value="SPAM">SPAM</option>
-                      </select>
+                      <AutoSubmitStatusSelect
+                            kind="contact"
+                            defaultValue={e.status}
+                            className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5"
+                          />
                     </form>
                   </div>
 
