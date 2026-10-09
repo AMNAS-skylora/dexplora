@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { AutoSubmitStatusSelect } from "@/components/admin/AutoSubmitStatusSelect";
 import { formatDate } from "@/lib/utils";
 import { deleteContact } from "@/actions";
 import { Trash2 } from "lucide-react";
@@ -78,25 +79,12 @@ export default async function AdminEnquiriesPage() {
                       className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5 disabled:opacity-60"
                     />
                   </div>
-
-                  <div className="text-xs space-y-0.5">
-                    <p className="font-semibold text-gray-700">{e.phone}</p>
-                    {e.email && <p className="text-[11px] text-gray-400">{e.email}</p>}
-                    <p className="text-[#3478F6] font-bold pt-1">{e.subject || "General Enquiry"}</p>
-                  </div>
-
-                  <div className="bg-white p-3 rounded-xl border border-[#E8ECF3] text-xs text-gray-700 italic">
-                    &ldquo;{e.message}&rdquo;
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1 text-[11px] text-gray-400">
-                    <span>{formatDate(e.createdAt)}</span>
-                    <form action={async () => { "use server"; await deleteContact(e.id); }}>
-                      <button type="submit" className="text-red-500 hover:text-red-700 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </form>
-                  </div>
+                  <span>{formatDate(e.createdAt)}</span>
+                  <form action={async () => { "use server"; await deleteContact(e.id); }}>
+                    <button type="submit" className="text-red-500 hover:text-red-700 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </form>
                 </div>
               ))}
             </div>

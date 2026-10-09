@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { AutoSubmitStatusSelect } from "@/components/admin/AutoSubmitStatusSelect";
 import { formatDate } from "@/lib/utils";
 import { deleteBooking } from "@/actions";
 import { Trash2 } from "lucide-react";
@@ -93,19 +94,6 @@ export default async function AdminBookingsPage() {
                       status={b.status}
                       className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5 disabled:opacity-60"
                     />
-                  </div>
-
-                  <div>
-                    <h3 className="font-bold text-sm text-[#0B1026]">{b.fullName}</h3>
-                    <p className="text-xs text-gray-600 font-semibold">{b.phone}</p>
-                    {b.email && <p className="text-[11px] text-gray-400">{b.email}</p>}
-                  </div>
-
-                  <div className="pt-2 border-t border-[#E8ECF3] text-xs space-y-1">
-                    <div className="font-bold text-[#0B1026]">{b.package.title}</div>
-                    <div className="text-gray-500">Travelers: <span className="font-bold text-[#0B1026]">{b.numberOfTravellers}</span> (A: {b.adults}, C: {b.children})</div>
-                    <div className="text-gray-500">Boarding: <span className="font-medium text-[#0B1026]">{b.boardingLocation || "Kerala"}</span></div>
-                    <div className="text-[11px] text-gray-400 pt-1">{formatDate(b.createdAt)}</div>
                   </div>
 
                   <div className="flex justify-end pt-2">
