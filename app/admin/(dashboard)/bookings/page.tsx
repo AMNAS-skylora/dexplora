@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { AutoSubmitStatusSelect } from "@/components/admin/AutoSubmitStatusSelect";
 import { formatDate } from "@/lib/utils";
 import { updateBookingStatus, deleteBooking } from "@/actions";
 import { Trash2, Phone, Mail, Send } from "lucide-react";
@@ -66,18 +67,11 @@ export default async function AdminBookingsPage() {
                           "use server";
                           await updateBookingStatus(b.id, formData.get("status") as any);
                         }}>
-                          <select
-                            name="status"
+                          <AutoSubmitStatusSelect
+                            kind="booking"
                             defaultValue={b.status}
-                            onChange={(e) => e.target.form?.requestSubmit()}
                             className="bg-[#F3F7FF] border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1"
-                          >
-                            <option value="NEW">NEW</option>
-                            <option value="READ">READ</option>
-                            <option value="CONTACTED">CONTACTED</option>
-                            <option value="CONFIRMED">CONFIRMED</option>
-                            <option value="CANCELLED">CANCELLED</option>
-                          </select>
+                          />
                         </form>
                       </td>
                       <td className="py-4 text-right">
@@ -103,18 +97,11 @@ export default async function AdminBookingsPage() {
                       "use server";
                       await updateBookingStatus(b.id, formData.get("status") as any);
                     }}>
-                      <select
-                        name="status"
-                        defaultValue={b.status}
-                        onChange={(e) => e.target.form?.requestSubmit()}
-                        className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5"
-                      >
-                        <option value="NEW">NEW</option>
-                        <option value="READ">READ</option>
-                        <option value="CONTACTED">CONTACTED</option>
-                        <option value="CONFIRMED">CONFIRMED</option>
-                        <option value="CANCELLED">CANCELLED</option>
-                      </select>
+                      <AutoSubmitStatusSelect
+                            kind="booking"
+                            defaultValue={b.status}
+                            className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5"
+                          />
                     </form>
                   </div>
 
