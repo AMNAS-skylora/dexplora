@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
 import { AutoSubmitStatusSelect } from "@/components/admin/AutoSubmitStatusSelect";
 import { formatDate } from "@/lib/utils";
-import { updateBookingStatus, deleteBooking } from "@/actions";
-import { Trash2, Phone, Mail, Send } from "lucide-react";
+import { deleteBooking } from "@/actions";
+import { Trash2 } from "lucide-react";
+import { BookingStatusSelect } from "./BookingStatusSelect";
 
 export const revalidate = 0;
 
@@ -63,16 +64,11 @@ export default async function AdminBookingsPage() {
                       <td className="py-4 text-gray-600">{b.boardingLocation || "Kerala"}</td>
                       <td className="py-4 text-gray-500">{formatDate(b.createdAt)}</td>
                       <td className="py-4">
-                        <form action={async (formData: FormData) => {
-                          "use server";
-                          await updateBookingStatus(b.id, formData.get("status") as any);
-                        }}>
-                          <AutoSubmitStatusSelect
-                            kind="booking"
-                            defaultValue={b.status}
-                            className="bg-[#F3F7FF] border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1"
-                          />
-                        </form>
+                        <BookingStatusSelect
+                          id={b.id}
+                          status={b.status}
+                          className="bg-[#F3F7FF] border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1 disabled:opacity-60"
+                        />
                       </td>
                       <td className="py-4 text-right">
                         <form action={async () => { "use server"; await deleteBooking(b.id); }}>
@@ -93,29 +89,11 @@ export default async function AdminBookingsPage() {
                 <div key={b.id} className="bg-[#F3F7FF]/50 border border-[#E8ECF3] rounded-2xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="font-black text-sm text-[#3478F6]">{b.referenceCode}</span>
-                    <form action={async (formData: FormData) => {
-                      "use server";
-                      await updateBookingStatus(b.id, formData.get("status") as any);
-                    }}>
-                      <AutoSubmitStatusSelect
-                            kind="booking"
-                            defaultValue={b.status}
-                            className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5"
-                          />
-                    </form>
-                  </div>
-
-                  <div>
-                    <h3 className="font-bold text-sm text-[#0B1026]">{b.fullName}</h3>
-                    <p className="text-xs text-gray-600 font-semibold">{b.phone}</p>
-                    {b.email && <p className="text-[11px] text-gray-400">{b.email}</p>}
-                  </div>
-
-                  <div className="pt-2 border-t border-[#E8ECF3] text-xs space-y-1">
-                    <div className="font-bold text-[#0B1026]">{b.package.title}</div>
-                    <div className="text-gray-500">Travelers: <span className="font-bold text-[#0B1026]">{b.numberOfTravellers}</span> (A: {b.adults}, C: {b.children})</div>
-                    <div className="text-gray-500">Boarding: <span className="font-medium text-[#0B1026]">{b.boardingLocation || "Kerala"}</span></div>
-                    <div className="text-[11px] text-gray-400 pt-1">{formatDate(b.createdAt)}</div>
+                    <BookingStatusSelect
+                      id={b.id}
+                      status={b.status}
+                      className="bg-white border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-2.5 py-1.5 disabled:opacity-60"
+                    />
                   </div>
 
                   <div className="flex justify-end pt-2">
