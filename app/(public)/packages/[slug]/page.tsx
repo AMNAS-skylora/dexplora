@@ -171,7 +171,17 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
   const exclusions = Array.isArray(pkg.exclusions) ? pkg.exclusions : [];
   const faqs = Array.isArray(pkg.faqs) ? pkg.faqs : [];
 
-  const nextBatch = batches.length > 0 ? (batches[0] ?? null) : null;
+  const nextBatch = [...batches]
+    .filter((batch: any) => new Date(batch.startDate).getTime() >= Date.now() && batch.status !== "CANCELLED")
+    .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0] ?? null;
+  const itineraryDeparture = batches.find((batch: any) => batch.id === initialDepartureId) ?? nextBatch;
+  const itineraryDayDate = (dayNumber: number) => {
+    if (!itineraryDeparture?.startDate) return null;
+    const date = new Date(itineraryDeparture.startDate);
+    if (Number.isNaN(date.getTime())) return null;
+    date.setUTCDate(date.getUTCDate() + Math.max(0, dayNumber - 1));
+    return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
+  };
 
   // Safe WhatsApp & Phone handling
   const cleanWhatsapp = (settings?.whatsapp_number ?? "").replace(/\D/g, "");
@@ -429,7 +439,15 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
                       <span className="w-8 h-8 rounded-xl bg-[#3478F6] text-white font-extrabold text-xs flex items-center justify-center shrink-0">
                         Day {it.dayNumber}
                       </span>
-                      <h3 className="font-bold text-sm sm:text-base text-[#0B1026]">{it.title}</h3>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
+                        <h3 className="font-bold text-sm sm:text-base text-[#0B1026]">{it.title}</h3>
+                        {itineraryDayDate(it.dayNumber) && (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-[#64748B]">
+                            <CalendarDays className="w-3.5 h-3.5" />
+                            {itineraryDayDate(it.dayNumber)}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed sm:pl-11 break-words">
