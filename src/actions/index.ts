@@ -880,21 +880,18 @@ export async function updateBatchBooking(id: string, data: Partial<BookingInputD
       return { error: "Cannot confirm a booking in a cancelled departure." };
     }
 
-    // Secure server-side recalculation
-    const totalAmount = unitPrice * travellerCount;
-
     const payments = Array.isArray(existing.payments) ? existing.payments : [];
-    const totalPaidHistory = payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-
-    const paidAmount = data.paidAmount !== undefined ? Number(data.paidAmount) : Math.max(totalPaidHistory, Number(existing.paidAmount) || 0);
-    const balanceAmount = Math.max(0, totalAmount - paidAmount);
-
-    let paymentStatus = "Pending";
-    if (paidAmount >= totalAmount && totalAmount > 0) {
-      paymentStatus = "Paid";
-    } else if (paidAmount > 0) {
-      paymentStatus = "Partially Paid";
+    const paymentSum = payments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+    const previouslyPaid = Math.max(paymentSum, Number(existing.paidAmount) || 0);
+    if (data.paidAmount !== undefined && Math.abs(Number(data.paidAmount) - previouslyPaid) > 0.009) {
+      return { error: "Use Add Payment to record payments. Editing a profile cannot change payment records." };
     }
+    const rows = getBookingBillingRows(existing, unitPrice).slice(0, travellerCount);
+    while (rows.length < travellerCount) {
+      rows.push({ ...createInitialBillingRows(1, unitPrice)[0], slot: rows.length + 1 });
+    }
+    const bill = calculateBookingBilling({ rows, travellerCount, paidAmount: previouslyPaid });
+    const { totalAmount, paidAmount, balanceAmount, paymentStatus, creditAmount } = bill;
 
     const updated = await db.booking.update({
       where: { id },
@@ -914,6 +911,9 @@ export async function updateBatchBooking(id: string, data: Partial<BookingInputD
         ...(data.travellerCount !== undefined && { travellerCount: Number(data.travellerCount) }),
         totalAmount,
         unitPrice,
+        billingRows: bill.rows,
+        billingVersion: 1,
+        creditAmount,
         paidAmount,
         balanceAmount,
         paymentStatus,
