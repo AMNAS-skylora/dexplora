@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { normalizeDepartureInput } from "@/lib/departure-rules";
 import { notifyBookingEvent } from "@/lib/email/booking-notifications";
 import { buildPackageEmbeddedRelations } from "@/lib/package-relations";
 import { setAdminSessionCookie, clearAdminSessionCookie, getAdminSession } from "@/lib/auth";
@@ -515,35 +516,43 @@ export async function createTripBatch(data: TripBatchInputData) {
   if (!session) return { error: "Unauthorized" };
 
   try {
-    if (!data.packageId || !data.packageId.trim()) {
-      return { error: "Please select a valid package for this departure batch." };
-    }
+    if (!data.packageId?.trim()) return { error: "Select a valid package." };
+    const pkg = await db.package.findUnique({ where: { id: data.packageId } });
+    if (!pkg) return { error: "Selected package was not found." };
 
-    const totalSeats = Number(data.totalSeats) || 30;
-    const bookedSeats = Number(data.bookedSeats) || 0;
-    const availableSeats = Math.max(0, totalSeats - bookedSeats);
+    // Each call creates an independent TripBatch. Same dates and packages are allowed.
+    const departure = normalizeDepartureInput({
+      startDate: data.startDate,
+      endDate: data.endDate,
+      totalSeats: data.totalSeats ?? 30,
+      priceOverride: data.priceOverride,
+      status: data.status || "OPEN",
+    }, Number(pkg.price || 0));
 
     const batch = await db.tripBatch.create({
       data: {
         packageId: data.packageId,
-        batchName: data.batchName || null,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        priceOverride: data.priceOverride ? Number(data.priceOverride) : null,
-        totalSeats,
-        bookedSeats,
-        availableSeats,
-        status: data.status as BatchStatus,
-        boardingPoint: data.boardingPoint || null,
-        notes: data.notes || null,
+        batchName: data.batchName?.trim() || null,
+        startDate: departure.startDate,
+        endDate: departure.endDate,
+        priceOverride: departure.priceOverride,
+        totalSeats: departure.totalSeats,
+        bookedSeats: 0,
+        availableSeats: departure.availableSeats,
+        status: departure.status as BatchStatus,
+        boardingPoint: data.boardingPoint?.trim() || null,
+        notes: data.notes?.trim() || null,
       },
     });
 
     revalidatePath("/upcoming-trips");
     revalidatePath("/admin/upcoming-trips");
+    revalidatePath("/packages");
+    revalidatePath(`/packages/${pkg.slug}`);
     return { success: true, batch };
-  } catch (error) {
-    return { error: "Failed to create batch." };
+  } catch (error: any) {
+    console.error("Create departure failed:", error);
+    return { error: error instanceof Error ? error.message : "Failed to create departure." };
   }
 }
 
@@ -551,10 +560,19 @@ export async function deleteTripBatch(id: string) {
   const session = await getAdminSession();
   if (!session) return { error: "Unauthorized" };
 
-  await db.tripBatch.delete({ where: { id } });
-  revalidatePath("/upcoming-trips");
-  revalidatePath("/admin/upcoming-trips");
-  return { success: true };
+  try {
+    const existing = await db.tripBatch.findUnique({ where: { id } });
+    if (!existing) return { error: "Departure not found." };
+    const bookingCount = await db.booking.count({ where: { tripBatchId: id } });
+    if (bookingCount > 0) return { error: "Cannot delete a departure with traveller bookings. Cancel or close it instead." };
+    await db.tripBatch.delete({ where: { id } });
+    revalidatePath("/upcoming-trips");
+    revalidatePath("/admin/upcoming-trips");
+    revalidatePath("/packages");
+    return { success: true };
+  } catch (error: any) {
+    return { error: error?.message || "Could not delete departure." };
+  }
 }
 
 export async function updateTripBatch(id: string, data: Partial<TripBatchInputData>) {
@@ -562,39 +580,56 @@ export async function updateTripBatch(id: string, data: Partial<TripBatchInputDa
   if (!session) return { error: "Unauthorized" };
 
   try {
-    const existing = await db.tripBatch.findUnique({ where: { id } });
-    if (!existing) return { error: "Batch not found" };
+    const existing = await db.tripBatch.findUnique({ where: { id }, include: { package: true } });
+    if (!existing) return { error: "Departure not found." };
 
-    const totalSeats = data.totalSeats !== undefined ? Number(data.totalSeats) : existing.totalSeats;
-    const bookedSeats = data.bookedSeats !== undefined ? Number(data.bookedSeats) : existing.bookedSeats;
-    const availableSeats = Math.max(0, totalSeats - bookedSeats);
+    const allBookings = await db.booking.findMany({ where: { tripBatchId: id } });
+    const bookedSeats = allBookings
+      .filter((b: any) => String(b.bookingStatus || b.status || "").toUpperCase() !== "CANCELLED")
+      .reduce((sum: number, b: any) => sum + Math.max(1, Number(b.travellerCount) || 1), 0);
 
-    let status = data.status || existing.status;
-    if (availableSeats === 0) status = "SOLD_OUT";
+    const packageId = data.packageId || existing.packageId;
+    if (packageId !== existing.packageId && allBookings.length > 0) {
+      return { error: "Cannot move a departure with existing bookings to another package." };
+    }
+    const pkg = await db.package.findUnique({ where: { id: packageId } });
+    if (!pkg) return { error: "Selected package was not found." };
+
+    const departure = normalizeDepartureInput({
+      startDate: data.startDate ?? existing.startDate,
+      endDate: data.endDate ?? existing.endDate,
+      totalSeats: data.totalSeats ?? existing.totalSeats,
+      priceOverride: data.priceOverride === undefined ? existing.priceOverride : data.priceOverride,
+      status: data.status ?? existing.status ?? "OPEN",
+    }, Number(pkg.price || 0), bookedSeats);
 
     const updated = await db.tripBatch.update({
       where: { id },
       data: {
-        ...(data.packageId && { packageId: data.packageId }),
-        ...(data.batchName !== undefined && { batchName: data.batchName || null }),
-        ...(data.startDate && { startDate: new Date(data.startDate) }),
-        ...(data.endDate && { endDate: new Date(data.endDate) }),
-        ...(data.priceOverride !== undefined && { priceOverride: data.priceOverride ? Number(data.priceOverride) : null }),
-        totalSeats,
-        bookedSeats,
-        availableSeats,
-        status,
-        ...(data.boardingPoint !== undefined && { boardingPoint: data.boardingPoint || null }),
-        ...(data.notes !== undefined && { notes: data.notes || null }),
+        packageId,
+        ...(data.batchName !== undefined ? { batchName: data.batchName?.trim() || null } : {}),
+        startDate: departure.startDate,
+        endDate: departure.endDate,
+        priceOverride: departure.priceOverride,
+        totalSeats: departure.totalSeats,
+        bookedSeats: departure.bookedSeats,
+        availableSeats: departure.availableSeats,
+        status: departure.status as BatchStatus,
+        ...(data.boardingPoint !== undefined ? { boardingPoint: data.boardingPoint?.trim() || null } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes?.trim() || null } : {}),
       },
     });
 
     revalidatePath("/upcoming-trips");
     revalidatePath("/admin/upcoming-trips");
     revalidatePath(`/admin/upcoming-trips/${id}`);
+    revalidatePath("/packages");
+    revalidatePath(`/packages/${pkg.slug}`);
+    if (packageId !== existing.packageId && existing.package?.slug) revalidatePath(`/packages/${existing.package.slug}`);
     return { success: true, batch: updated };
   } catch (error: any) {
-    return { error: error?.message || "Failed to update batch." };
+    console.error("Update departure failed:", error);
+    return { error: error instanceof Error ? error.message : "Failed to update departure." };
   }
 }
 
