@@ -59,6 +59,7 @@ export function MobileBottomNav() {
     { name: "Instagram Feed", href: "/admin/instagram", icon: InstagramIcon },
     { name: "Testimonials", href: "/admin/testimonials", icon: MessageSquare },
     { name: "Bookings", href: "/admin/bookings", icon: BookmarkCheck },
+    { name: "Email Notifications", href: "/admin/email", icon: Mail },
     { name: "Enquiries", href: "/admin/enquiries", icon: Mail },
     { name: "Website Settings", href: "/admin/settings", icon: Settings },
   ];
