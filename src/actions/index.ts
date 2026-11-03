@@ -988,19 +988,25 @@ export async function addPaymentToBooking(
       notes: paymentData.notes || null,
     };
 
-    const existingPayments = Array.isArray(booking.payments) ? booking.payments : [];
-    const updatedPayments = [...existingPayments, newPayment];
-
-    const totalPaid = updatedPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-    const totalAmount = Number(booking.totalAmount) || 0;
-    const balanceAmount = Math.max(0, totalAmount - totalPaid);
-
-    let paymentStatus = "Pending";
-    if (totalPaid >= totalAmount && totalAmount > 0) {
-      paymentStatus = "Paid";
-    } else if (totalPaid > 0) {
-      paymentStatus = "Partially Paid";
+    if (!Number.isFinite(Number(paymentData.amount)) || Number(paymentData.amount) <= 0) {
+      return { error: "Payment must be greater than zero." };
     }
+    const existingPayments = Array.isArray(booking.payments) ? booking.payments : [];
+    const previouslyPaid = Math.max(
+      Number(booking.paidAmount) || 0,
+      existingPayments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
+    );
+    const totalAmount = Number(booking.totalAmount) || 0;
+    if (previouslyPaid >= totalAmount) {
+      return { error: "This booking has no outstanding balance. Use refund/credit reconciliation for overpayments." };
+    }
+    if (Number(paymentData.amount) > totalAmount - previouslyPaid + 0.009) {
+      return { error: "Payment is greater than the outstanding balance." };
+    }
+    const updatedPayments = [...existingPayments, newPayment];
+    const totalPaid = Math.round((previouslyPaid + Number(newPayment.amount)) * 100) / 100;
+    const balanceAmount = Math.max(0, Math.round((totalAmount - totalPaid) * 100) / 100);
+    const paymentStatus = totalPaid >= totalAmount ? "Paid" : "Partially Paid";
 
     const updated = await db.booking.update({
       where: { id: bookingId },
@@ -1008,6 +1014,7 @@ export async function addPaymentToBooking(
         payments: updatedPayments,
         paidAmount: totalPaid,
         balanceAmount,
+        creditAmount: Math.max(0, totalPaid - totalAmount),
         paymentStatus,
       },
     });
