@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatDate, formatPrice, getWhatsAppLink } from "@/lib/utils";
+import { TravellerBillingEditor } from "@/components/admin/TravellerBillingEditor";
+import { getBookingBillingRows, type TravellerBillingRow } from "@/lib/traveller-billing";
 import {
   addPaymentToBooking,
   addTravellerToBookingList,
@@ -51,6 +53,7 @@ interface EventSummary {
   endDate: string | Date;
   departurePoint: string;
   arrivalDestination: string;
+  packagePrice: number;
 }
 
 interface CustomerBookingDetails {
@@ -70,6 +73,10 @@ interface CustomerBookingDetails {
   emergencyPhone?: string | null;
   travellerCount: number;
   totalAmount: number;
+  unitPrice?: number | null;
+  billingRows?: TravellerBillingRow[];
+  billingRevision?: number;
+  creditAmount?: number;
   paidAmount: number;
   balanceAmount: number;
   paymentStatus: string;
@@ -189,6 +196,7 @@ export function CustomerDetailClient({ event, customer }: CustomerDetailClientPr
 
   const getPaymentBadgeClass = (status: string) => {
     switch (status.toUpperCase()) {
+      case "FREE":
       case "PAID":
         return "bg-emerald-100 text-emerald-800 border-emerald-200";
       case "PARTIALLY PAID":
@@ -257,6 +265,14 @@ export function CustomerDetailClient({ event, customer }: CustomerDetailClientPr
           </div>
         </div>
       </div>
+
+      {/* Per-person complimentary packages, included tickets and additional AC charges */}
+      <TravellerBillingEditor
+        key={`${customer.id}:${customer.billingRevision ?? 0}`}
+        bookingId={customer.id}
+        paidAmount={customer.paidAmount}
+        initialRows={getBookingBillingRows(customer, event.packagePrice)}
+      />
 
       {/* Customer Profile & Booking Overview Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
