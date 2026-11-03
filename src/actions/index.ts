@@ -73,6 +73,20 @@ export async function createBookingEnquiry(data: {
   message?: string;
 }) {
   try {
+    const travellerCount = Number(data.numberOfTravellers);
+    if (!Number.isSafeInteger(travellerCount) || travellerCount < 1) {
+      return { error: "Select a valid number of travellers." };
+    }
+    if (data.batchId) {
+      const departure = await db.tripBatch.findUnique({ where: { id: data.batchId } });
+      if (!departure || departure.packageId !== data.packageId) {
+        return { error: "Selected departure does not belong to this package." };
+      }
+      if (["SOLD_OUT", "CANCELLED", "COMPLETED"].includes(String(departure.status)) ||
+          Number(departure.availableSeats) < travellerCount) {
+        return { error: "Not enough seats in the selected departure. Choose another departure." };
+      }
+    }
     const referenceCode = generateBookingRef();
     const booking = await db.bookingEnquiry.create({
       data: {
