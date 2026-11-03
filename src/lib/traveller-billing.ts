@@ -144,7 +144,7 @@ export function calculateBookingBilling(input: BookingBillingInput) {
         category: extra.category,
         description,
         amount,
-        complimentary: Boolean(extra.complimentary) || row.benefit === "FULL_FREE",
+        complimentary: Boolean(extra.complimentary),
         charged: Boolean(extra.complimentary) || row.benefit === "FULL_FREE" ? 0 : amount,
       };
     });
