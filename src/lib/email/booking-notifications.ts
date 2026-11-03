@@ -35,7 +35,7 @@ export async function notifyBookingEvent(
   if (!siteUrl || !/^https:\/\//i.test(siteUrl)) return "SKIPPED";
 
   const id = ["booking-email", kind, booking.id, eventId].join(":");
-  const col = getDb().collection("EmailDeliveryLogs");
+  const col = getDb().collection<{ _id: string; status: string; [key: string]: unknown }>("EmailDeliveryLogs");
   try {
     const previous = await col.findOne({ _id: id });
     if (previous && (previous.status === "SMTP_ACCEPTED" || previous.status === "SENDING")) {
