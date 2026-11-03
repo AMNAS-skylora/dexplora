@@ -27,6 +27,7 @@ export interface PackageCardProps {
     status: string;
   }>;
   featured?: boolean;
+  departureId?: string;
 }
 
 export function PackageCard({
@@ -40,6 +41,7 @@ export function PackageCard({
   departureLocation,
   destination,
   batches,
+  departureId,
 }: PackageCardProps) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -52,7 +54,7 @@ export function PackageCard({
 
   const handleNavigate = () => {
     startTransition(() => {
-      router.push(`/packages/${slug}`);
+      router.push(`/packages/${slug}${departureId ? `?departure=${encodeURIComponent(departureId)}` : ""}`);
     });
   };
 
