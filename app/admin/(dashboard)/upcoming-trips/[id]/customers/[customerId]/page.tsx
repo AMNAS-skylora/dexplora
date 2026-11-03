@@ -26,10 +26,12 @@ export default async function AdminCustomerDetailPage({ params }: PageProps) {
   }
 
   const pkg = batch.package || {};
+  if (String(booking.tripBatchId) !== String(batch.id)) notFound();
 
   const enrichedBatch = {
     id: batch.id,
     packageTitle: pkg.title || "Package not set",
+    packagePrice: batch.priceOverride != null ? Number(batch.priceOverride) : Number(pkg.price || 0),
     batchName: batch.batchName || "Standard Departure",
     startDate: batch.startDate,
     endDate: batch.endDate,
