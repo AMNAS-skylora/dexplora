@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { notifyBookingEvent } from "@/lib/email/booking-notifications";
 import { buildPackageEmbeddedRelations } from "@/lib/package-relations";
 import { setAdminSessionCookie, clearAdminSessionCookie, getAdminSession } from "@/lib/auth";
 import { generateBookingRef, slugify } from "@/lib/utils";
@@ -736,6 +737,8 @@ export async function createBatchBooking(data: BookingInputData) {
       },
     });
 
+    await notifyBookingEvent("BOOKING_CONFIRMATION", booking, batch, "created");
+
     revalidatePath("/admin/upcoming-trips");
     revalidatePath(`/admin/upcoming-trips/${data.tripBatchId}`);
     return { success: true, booking };
@@ -891,6 +894,16 @@ export async function addPaymentToBooking(
         paymentStatus,
       },
     });
+
+    if (Number(newPayment.amount) > 0 && booking.tripBatchId) {
+      const trip = await db.tripBatch.findUnique({
+        where: { id: booking.tripBatchId },
+        include: { package: true },
+      });
+      if (trip) await notifyBookingEvent(
+        "PAYMENT_RECEIPT", updated, trip, "payment-" + String(newPayment.paidAt.getTime())
+      );
+    }
 
     revalidatePath("/admin/upcoming-trips");
     if (booking.tripBatchId) {
