@@ -98,10 +98,10 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
 
   const handleOpenCreateModal = (sameDateAs?: EnrichedBatch) => {
     setEditingBatch(null);
-    const defaultPkg = packages[0];
+    const defaultPkg = packages.find((pkg) => pkg.id === sameDateAs?.packageId) || packages[0];
     if (defaultPkg) {
       setSelectedPackageId(defaultPkg.id);
-      setBoardingPoint(defaultPkg.departureLocation || "Kerala");
+      setBoardingPoint(sameDateAs?.boardingPoint || defaultPkg.departureLocation || "Kerala");
     }
     setBatchName("");
     // Start a new independent departure, optionally reusing the same dates.
@@ -500,6 +500,7 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
                 <select
                   value={selectedPackageId}
                   onChange={(e) => handlePackageChange(e.target.value)}
+                  disabled={Boolean(editingBatch?.bookingsCount)}
                   required
                   className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#0B1026] outline-none focus:border-[#3478F6] min-h-[44px]"
                 >
@@ -510,6 +511,12 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
                   ))}
                 </select>
               </div>
+
+              {editingBatch && editingBatch.bookingsCount > 0 && (
+                <p className="text-[11px] font-semibold text-amber-700">
+                  This departure already has bookings. Its package cannot be changed, but the rate and capacity can be edited safely.
+                </p>
+              )}
 
               {/* Batch Name */}
               <div>
