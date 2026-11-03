@@ -58,6 +58,7 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
     { name: "Gallery", href: "/admin/gallery", icon: ImageIcon },
     { name: "Testimonials", href: "/admin/testimonials", icon: MessageSquare },
     { name: "Bookings", href: "/admin/bookings", icon: BookmarkCheck },
+    { name: "Email Notifications", href: "/admin/email", icon: Mail },
     { name: "Enquiries", href: "/admin/enquiries", icon: Mail },
     { name: "Data Archives", href: "/admin/archives", icon: Archive },
     { name: "Website Settings", href: "/admin/settings", icon: Settings },
