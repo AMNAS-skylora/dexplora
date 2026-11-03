@@ -108,7 +108,7 @@ export function PackageDeparturesCalendar({
       const isActiveStatus = b.status !== "CANCELLED" && b.status !== "COMPLETED";
 
       return isFuture && isActiveStatus;
-    });
+    }).sort((a, b) => parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime());
   }, [batches]);
 
   // Map batches by date key for O(1) lookups
