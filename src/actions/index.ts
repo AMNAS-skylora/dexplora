@@ -827,8 +827,28 @@ export async function updateBatchBooking(id: string, data: Partial<BookingInputD
       : null;
     const pkg = batch?.package || (batch?.packageId ? await db.package.findUnique({ where: { id: batch.packageId } }) : null);
 
-    const unitPrice = Number(batch?.priceOverride) || Number(pkg?.price) || (existing.totalAmount / (existing.travellerCount || 1)) || 0;
-    const travellerCount = data.travellerCount !== undefined ? Math.max(1, Number(data.travellerCount)) : (existing.travellerCount || 1);
+    if (data.tripBatchId && data.tripBatchId !== existing.tripBatchId) {
+      return { error: "Moving a booking to another departure is not supported. Cancel and create a new booking in the correct departure." };
+    }
+    // Preserve each booking's original rate when an administrator changes the departure rate.
+    const unitPrice = Number(existing.unitPrice) || (Number(existing.totalAmount || 0) / Math.max(1, Number(existing.travellerCount) || 1)) || Number(batch?.priceOverride ?? pkg?.price ?? 0);
+    const travellerCount = data.travellerCount !== undefined ? Number(data.travellerCount) : Number(existing.travellerCount || 1);
+    if (!Number.isSafeInteger(travellerCount) || travellerCount < 1) return { error: "Traveller count must be a positive whole number." };
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) return { error: "Booking unit price is invalid." };
+
+    if (!batch) return { error: "Associated departure not found." };
+    const otherBookings = await db.booking.findMany({ where: { tripBatchId: existing.tripBatchId } });
+    const otherBookedSeats = otherBookings
+      .filter((bk: any) => bk.id !== id && String(bk.bookingStatus || bk.status || "").toUpperCase() !== "CANCELLED")
+      .reduce((sum: number, bk: any) => sum + Math.max(1, Number(bk.travellerCount) || 1), 0);
+    const nextBookingStatus = String(data.bookingStatus || existing.bookingStatus || existing.status || "Confirmed").toUpperCase();
+    const requiredSeats = nextBookingStatus === "CANCELLED" ? 0 : travellerCount;
+    if (otherBookedSeats + requiredSeats > Number(batch.totalSeats)) {
+      return { error: "This departure does not have enough free seats for the requested traveller count." };
+    }
+    if (nextBookingStatus !== "CANCELLED" && String(batch.status || "").toUpperCase() === "CANCELLED") {
+      return { error: "Cannot confirm a booking in a cancelled departure." };
+    }
 
     // Secure server-side recalculation
     const totalAmount = unitPrice * travellerCount;
@@ -863,6 +883,7 @@ export async function updateBatchBooking(id: string, data: Partial<BookingInputD
         ...(data.emergencyPhone !== undefined && { emergencyPhone: data.emergencyPhone }),
         ...(data.travellerCount !== undefined && { travellerCount: Number(data.travellerCount) }),
         totalAmount,
+        unitPrice,
         paidAmount,
         balanceAmount,
         paymentStatus,
@@ -892,7 +913,8 @@ export async function updateBatchBooking(id: string, data: Partial<BookingInputD
           .reduce((sum: number, b: any) => sum + (b.travellerCount || 1), 0);
 
         const availableSeats = Math.max(0, batch.totalSeats - totalBookedSeats);
-        const newBatchStatus = availableSeats === 0 ? "SOLD_OUT" : (availableSeats <= 5 ? "FILLING_FAST" : "OPEN");
+        const newBatchStatus = ["CANCELLED", "COMPLETED"].includes(String(batch.status))
+          ? batch.status : (availableSeats === 0 ? "SOLD_OUT" : (availableSeats <= 5 ? "FILLING_FAST" : "OPEN"));
 
         await db.tripBatch.update({
           where: { id: existing.tripBatchId },
