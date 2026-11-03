@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb";
 import { normalizeDepartureInput } from "@/lib/departure-rules";
 import { notifyBookingEvent } from "@/lib/email/booking-notifications";
 import { buildPackageEmbeddedRelations } from "@/lib/package-relations";
+import { calculateBookingBilling, createInitialBillingRows, getBookingBillingRows, type TravellerBenefit, type TravellerExtraCharge } from "@/lib/traveller-billing";
 import { setAdminSessionCookie, clearAdminSessionCookie, getAdminSession } from "@/lib/auth";
 import { generateBookingRef, slugify } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
@@ -649,6 +650,11 @@ export async function updateTripBatch(id: string, data: Partial<TripBatchInputDa
 }
 
 export interface BookingInputData {
+  initialBenefit?: TravellerBenefit;
+  initialTicketWaiver?: number;
+  initialCustomPackageAmount?: number | null;
+  initialExtraCharges?: TravellerExtraCharge[];
+  initialBillingReason?: string;
   tripBatchId: string;
   packageId?: string;
   customerName: string;
@@ -710,6 +716,25 @@ export async function createBatchBooking(data: BookingInputData) {
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
       return { error: "This departure has no valid rate per person." };
     }
+    const billingRows = createInitialBillingRows(
+      travellerCount, unitPrice,
+      [data.customerName.trim()],
+      {
+        benefit: data.initialBenefit ?? "STANDARD",
+        includedTicketValue: Number(data.initialTicketWaiver || 0),
+        customPackageAmount: data.initialCustomPackageAmount ?? null,
+        extras: data.initialExtraCharges || [],
+        reason: data.initialBillingReason || "",
+      }
+    );
+    const bill = calculateBookingBilling({
+      rows: billingRows, travellerCount, paidAmount: Number(data.paidAmount || 0),
+    });
+    if (bill.creditAmount > 0) {
+      return { error: "Initial payment exceeds the traveller bill. Enter the exact advance or adjust the free services." };
+    }
+    const { totalAmount, paidAmount, balanceAmount, paymentStatus } = bill;
+
     const activeBooking = String(data.bookingStatus || "Confirmed").toUpperCase() !== "CANCELLED";
     let reserved: any = null;
     const batchObjectId = ObjectId.isValid(data.tripBatchId) ? new ObjectId(data.tripBatchId) : null;
@@ -731,18 +756,6 @@ export async function createBatchBooking(data: BookingInputData) {
       if (!reserved) {
         return { error: "This departure is full, closed, or has fewer available seats than requested. Select another departure." };
       }
-    }
-
-    // Secure server-side calculation: Total = unit price * traveller count
-    const totalAmount = unitPrice * travellerCount;
-    const paidAmount = Number(data.paidAmount) || 0;
-    const balanceAmount = Math.max(0, totalAmount - paidAmount);
-
-    let paymentStatus = "Pending";
-    if (paidAmount >= totalAmount && totalAmount > 0) {
-      paymentStatus = "Paid";
-    } else if (paidAmount > 0) {
-      paymentStatus = "Partially Paid";
     }
 
     const bookingRef = generateBookingRef();
@@ -778,6 +791,9 @@ export async function createBatchBooking(data: BookingInputData) {
         travellerCount,
         totalAmount,
         unitPrice,
+        billingRows: bill.rows,
+        billingVersion: 1,
+        creditAmount: 0,
         paidAmount,
         balanceAmount,
         paymentStatus,
