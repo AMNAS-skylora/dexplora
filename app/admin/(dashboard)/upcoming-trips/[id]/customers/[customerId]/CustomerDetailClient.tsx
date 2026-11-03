@@ -346,7 +346,7 @@ export function CustomerDetailClient({ event, customer }: CustomerDetailClientPr
 
             <div className="space-y-2 text-xs pt-1">
               <div className="flex justify-between py-1 border-b border-[#E8ECF3]">
-                <span className="text-gray-500 font-medium">Total Package Price:</span>
+                <span className="text-gray-500 font-medium">Total Booking (Package + Extras):</span>
                 <span className="font-extrabold text-[#0B1026] text-sm">{formatPrice(customer.totalAmount)}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#E8ECF3]">
@@ -363,6 +363,11 @@ export function CustomerDetailClient({ event, customer }: CustomerDetailClientPr
                   <div className="text-xs font-black text-violet-700">{formatPrice((customer.payments || []).filter((p) => p.receivedBy === "Nihas").reduce((sum, p) => sum + (Number(p.amount) || 0), 0))}</div>
                 </div>
               </div>
+              {Number(customer.creditAmount || 0) > 0 && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] font-bold text-amber-800">
+                  Refund / Credit Reconciliation Required: {formatPrice(Number(customer.creditAmount || 0))}
+                </p>
+              )}
               <div className="flex justify-between py-1">
                 <span className="text-gray-500 font-bold">Remaining Due:</span>
                 <span className="font-extrabold text-red-600 text-base">{formatPrice(customer.balanceAmount)}</span>
