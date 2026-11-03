@@ -695,6 +695,13 @@ export interface BookingInputData {
 export async function createBatchBooking(data: BookingInputData) {
   const session = await getAdminSession();
   if (!session) return { error: "Unauthorized" };
+  if (
+    session.role === "EDITOR" &&
+    ((data.initialBenefit && data.initialBenefit !== "STANDARD") ||
+      (data.initialExtraCharges || []).some((extra) => extra.complimentary))
+  ) {
+    return { error: "Only an Admin may grant complimentary packages, tickets or discounts." };
+  }
 
   try {
     if (!data.tripBatchId) return { error: "Trip batch is required." };
