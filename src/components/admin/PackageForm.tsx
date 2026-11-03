@@ -148,8 +148,8 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
     initialData?.itineraries?.length
       ? initialData.itineraries.map((it, idx) => ({
           dayNumber: idx + 1,
-          title: it.title,
-          description: it.description,
+          title: it.title || "",
+          description: it.description || "",
           imageUrl: it.imageUrl || "",
         }))
       : [{ dayNumber: 1, title: "", description: "", imageUrl: "" }]
@@ -221,6 +221,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
 
     setLoading(true);
 
+    try {
     const formData = new FormData(e.currentTarget);
     const generatedDuration = `${days} Days / ${nights} Nights`;
 
@@ -249,14 +250,14 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       seoTitle: (formData.get("seoTitle") as string) || undefined,
       seoDescription: (formData.get("seoDescription") as string) || undefined,
       images: galleryImages.filter((img) => img.url.trim() !== ""),
-      itineraries: itineraries
-        .filter((it) => it.title.trim() !== "")
-        .map((it, idx) => ({
-          dayNumber: idx + 1,
-          title: it.title,
-          description: it.description,
-          imageUrl: it.imageUrl || null,
-        })),
+      // Save every row, including an added day that has not been filled in yet.
+      // The server normalizes titles and persists the complete array.
+      itineraries: itineraries.map((it, idx) => ({
+        dayNumber: idx + 1,
+        title: it.title.trim() || "Day " + (idx + 1),
+        description: it.description,
+        imageUrl: it.imageUrl || null,
+      })),
       inclusions: inclusions.filter((inc) => inc.trim() !== ""),
       exclusions: exclusions.filter((exc) => exc.trim() !== ""),
       faqs: faqs.filter((f) => f.question.trim() !== ""),
@@ -269,12 +270,17 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       result = await createPackage(data);
     }
 
-    setLoading(false);
     if (result.error) {
       setError(result.error);
     } else {
       router.push("/admin/packages");
       router.refresh();
+    }
+    } catch (err) {
+      console.error("Package save failed:", err);
+      setError("Saving failed. Your itinerary is still in this form. Check your connection and try again.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -688,7 +694,10 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       {/* 3. Dynamic Day-by-Day Itinerary Builder */}
       <div className="bg-white rounded-3xl p-6 border border-[#E8ECF3] shadow-sm space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-extrabold text-base text-[#0B1026]">3. Day-by-Day Itinerary</h3>
+          <div className="space-y-1">
+            <h3 className="font-extrabold text-base text-[#0B1026]">3. Day-by-Day Itinerary</h3>
+            <p className="text-xs text-gray-500">Each day is saved with this package. Dates are calculated from the selected departure, not fixed to the package.</p>
+          </div>
           <button
             type="button"
             onClick={addItineraryDay}
@@ -725,9 +734,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
                     type="text"
                     value={it.title}
                     onChange={(e) => {
-                      const updated = [...itineraries];
-                      updated[idx].title = e.target.value;
-                      setItineraries(updated);
+                      setItineraries((prev) => prev.map((day, i) => i === idx ? { ...day, title: e.target.value } : day));
                     }}
                     placeholder="e.g. Shillong to Cherrapunji Waterfalls & Caves"
                     className="w-full bg-white border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#0B1026] outline-none focus:border-[#3478F6]"
@@ -739,9 +746,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
                   <textarea
                     value={it.description}
                     onChange={(e) => {
-                      const updated = [...itineraries];
-                      updated[idx].description = e.target.value;
-                      setItineraries(updated);
+                      setItineraries((prev) => prev.map((day, i) => i === idx ? { ...day, description: e.target.value } : day));
                     }}
                     rows={3}
                     placeholder="Detailed schedule of places visited, activities and highlights..."
@@ -754,9 +759,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
                   dayNumber={it.dayNumber}
                   value={it.imageUrl}
                   onChange={(url) => {
-                    const updated = [...itineraries];
-                    updated[idx].imageUrl = url;
-                    setItineraries(updated);
+                    setItineraries((prev) => prev.map((day, i) => i === idx ? { ...day, imageUrl: url } : day));
                   }}
                 />
               </div>
