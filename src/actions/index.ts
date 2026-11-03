@@ -1,6 +1,7 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { db, getDb } from "@/lib/db";
+import { ObjectId } from "mongodb";
 import { normalizeDepartureInput } from "@/lib/departure-rules";
 import { notifyBookingEvent } from "@/lib/email/booking-notifications";
 import { buildPackageEmbeddedRelations } from "@/lib/package-relations";
@@ -687,8 +688,36 @@ export async function createBatchBooking(data: BookingInputData) {
     if (!batch) return { error: "Associated trip batch not found." };
 
     const pkg = batch.package || (batch.packageId ? await db.package.findUnique({ where: { id: batch.packageId } }) : null);
-    const unitPrice = Number(batch.priceOverride) || Number(pkg?.price) || 0;
-    const travellerCount = Math.max(1, Number(data.travellerCount) || 1);
+    const unitPrice = batch.priceOverride != null ? Number(batch.priceOverride) : Number(pkg?.price || 0);
+    const travellerCount = Number(data.travellerCount ?? 1);
+    if (!Number.isSafeInteger(travellerCount) || travellerCount < 1) {
+      return { error: "Traveller count must be a positive whole number." };
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      return { error: "This departure has no valid rate per person." };
+    }
+    const activeBooking = String(data.bookingStatus || "Confirmed").toUpperCase() !== "CANCELLED";
+    let reserved: any = null;
+    const batchObjectId = ObjectId.isValid(data.tripBatchId) ? new ObjectId(data.tripBatchId) : null;
+    if (!batchObjectId) return { error: "Invalid departure ID." };
+    if (activeBooking) {
+      // Atomic seat reservation prevents two concurrent bookings from consuming the same seat.
+      reserved = await getDb().collection("TripBatch").findOneAndUpdate(
+        {
+          _id: batchObjectId,
+          status: { $nin: ["CANCELLED", "COMPLETED", "SOLD_OUT"] },
+          availableSeats: { $gte: travellerCount },
+        },
+        {
+          $inc: { bookedSeats: travellerCount, availableSeats: -travellerCount },
+          $set: { updatedAt: new Date() },
+        },
+        { returnDocument: "after" }
+      );
+      if (!reserved) {
+        return { error: "This departure is full, closed, or has fewer available seats than requested. Select another departure." };
+      }
+    }
 
     // Secure server-side calculation: Total = unit price * traveller count
     const totalAmount = unitPrice * travellerCount;
@@ -712,7 +741,9 @@ export async function createBatchBooking(data: BookingInputData) {
       notes: "Initial payment during booking creation",
     }] : [];
 
-    const booking = await db.booking.create({
+    let booking: any;
+    try {
+    booking = await db.booking.create({
       data: {
         bookingRef,
         tripBatchId: data.tripBatchId,
@@ -732,6 +763,7 @@ export async function createBatchBooking(data: BookingInputData) {
         emergencyPhone: data.emergencyPhone || null,
         travellerCount,
         totalAmount,
+        unitPrice,
         paidAmount,
         balanceAmount,
         paymentStatus,
@@ -753,24 +785,22 @@ export async function createBatchBooking(data: BookingInputData) {
         payments,
       },
     });
+    } catch (bookingError) {
+      if (activeBooking && reserved) {
+        await getDb().collection("TripBatch").updateOne(
+          { _id: batchObjectId },
+          { $inc: { bookedSeats: -travellerCount, availableSeats: travellerCount } }
+        ).catch((rollbackError) => console.error("Seat reservation rollback failed:", rollbackError));
+      }
+      throw bookingError;
+    }
 
-    // Recalculate trip batch seats
-    const allBookings = await db.booking.findMany({ where: { tripBatchId: data.tripBatchId } });
-    const totalBookedSeats = allBookings
-      .filter((b: any) => b.bookingStatus !== "Cancelled" && b.status !== "CANCELLED")
-      .reduce((sum: number, b: any) => sum + (b.travellerCount || 1), 0);
-
-    const availableSeats = Math.max(0, batch.totalSeats - totalBookedSeats);
-    const newBatchStatus = availableSeats === 0 ? "SOLD_OUT" : (availableSeats <= 5 ? "FILLING_FAST" : "OPEN");
-
-    await db.tripBatch.update({
-      where: { id: data.tripBatchId },
-      data: {
-        bookedSeats: totalBookedSeats,
-        availableSeats,
-        status: newBatchStatus,
-      },
-    });
+    if (activeBooking && reserved.availableSeats <= 0) {
+      await getDb().collection("TripBatch").updateOne(
+        { _id: batchObjectId, availableSeats: { $lte: 0 }, status: { $nin: ["CANCELLED", "COMPLETED"] } },
+        { $set: { status: "SOLD_OUT", updatedAt: new Date() } }
+      ).catch((statusError) => console.error("Departure status update failed:", statusError));
+    }
 
     await notifyBookingEvent("BOOKING_CONFIRMATION", booking, batch, "created");
 
