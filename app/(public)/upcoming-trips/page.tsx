@@ -42,7 +42,7 @@ export default async function UpcomingTripsPage() {
       b.status !== "CANCELLED" &&
       b.status !== "COMPLETED" &&
       b.package &&
-      (b.package.status === "PUBLISHED" || b.package.status === undefined)
+      (["PUBLISHED", "SOLD_OUT"].includes(b.package.status) || b.package.status === undefined)
   );
 
   return (
