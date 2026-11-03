@@ -17,7 +17,7 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
       include: { package: true, bookings: true },
     }),
     db.package.findMany({
-      where: { status: "PUBLISHED" },
+      where: { status: { in: ["PUBLISHED", "SOLD_OUT"] } },
       select: { id: true, title: true, price: true, duration: true },
     }),
     db.expense.findMany({
