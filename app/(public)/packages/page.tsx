@@ -36,7 +36,7 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
 
   // Build MongoDB filter query
   const whereQuery: any = {
-    status: "PUBLISHED",
+    status: { in: ["PUBLISHED", "SOLD_OUT"] },
   };
 
   if (search) {
@@ -80,6 +80,21 @@ export default async function PackagesPage({ searchParams }: PackagesPageProps) 
       },
       orderBy: orderByQuery,
     });
+    // A formerly sold-out package becomes visible again if any departure has seats.
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    packages = packages.map((pkg: any) => ({
+      ...pkg,
+      batches: (Array.isArray(pkg.batches) ? pkg.batches : [])
+        .filter((batch: any) => new Date(batch.startDate).getTime() >= today.getTime() &&
+          !["CANCELLED", "COMPLETED"].includes(String(batch.status)))
+        .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()),
+    })).filter((pkg: any) =>
+      pkg.status === "PUBLISHED" ||
+      pkg.batches.some((batch: any) =>
+        batch.availableSeats > 0 && batch.status !== "SOLD_OUT"
+      )
+    );
   } catch (error) {
     console.error("Error fetching packages:", error);
   }
