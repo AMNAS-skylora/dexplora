@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { formatDate, formatPrice, getWhatsAppLink } from "@/lib/utils";
+import { calculateBookingBilling, createInitialBillingRows, type TravellerBenefit, type TravellerExtraCharge } from "@/lib/traveller-billing";
 
 function WhatsAppIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
   return (
@@ -152,6 +153,11 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
   const [travellerCount, setTravellerCount] = useState(1);
   const [totalAmount, setTotalAmount] = useState<number>(batch.priceOverride || batch.packagePrice || 14499);
   const [paidAmount, setPaidAmount] = useState<number>(0);
+  const [initialBenefit, setInitialBenefit] = useState<TravellerBenefit>("STANDARD");
+  const [initialTicketWaiver, setInitialTicketWaiver] = useState(0);
+  const [initialCustomPackageAmount, setInitialCustomPackageAmount] = useState("");
+  const [initialBillingReason, setInitialBillingReason] = useState("");
+  const [initialExtraCharges, setInitialExtraCharges] = useState<TravellerExtraCharge[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("UPI");
   const [paymentReceiver, setPaymentReceiver] = useState<"Rishal" | "Nihas">("Rishal");
   const [transactionId, setTransactionId] = useState("");
@@ -177,7 +183,25 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
   const [newPayTxnId, setNewPayTxnId] = useState("");
   const [newPayNotes, setNewPayNotes] = useState("");
 
-  const unitPrice = Number(batch.priceOverride) || Number(batch.packagePrice) || 0;
+  const unitPrice = batch.priceOverride != null ? Number(batch.priceOverride) : Number(batch.packagePrice || 0);
+  let initialBill: ReturnType<typeof calculateBookingBilling> | null = null;
+  let initialBillError = "";
+  if (!editingBooking) {
+    try {
+      const count = Math.min(200, Math.max(1, Math.floor(travellerCount) || 1));
+      initialBill = calculateBookingBilling({
+        rows: createInitialBillingRows(count, unitPrice, [customerName], {
+          benefit: initialBenefit,
+          includedTicketValue: initialTicketWaiver,
+          customPackageAmount: initialCustomPackageAmount === "" ? null : Number(initialCustomPackageAmount),
+          extras: initialExtraCharges,
+          reason: initialBillingReason,
+        }),
+        travellerCount: count,
+        paidAmount: paidAmount,
+      });
+    } catch (error) { initialBillError = error instanceof Error ? error.message : "Invalid traveller charges."; }
+  }
 
   // Filter Bookings
   const activeBookings = batch.bookings.filter((b) => {
@@ -239,6 +263,11 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
     setTravellerCount(1);
     setTotalAmount(batch.priceOverride || batch.packagePrice || 14499);
     setPaidAmount(0);
+    setInitialBenefit("STANDARD");
+    setInitialTicketWaiver(0);
+    setInitialCustomPackageAmount("");
+    setInitialBillingReason("");
+    setInitialExtraCharges([]);
     setPaymentMethod("UPI");
     setPaymentReceiver("Rishal");
     setTransactionId("");
@@ -324,6 +353,13 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
       travellerCount: Number(travellerCount) || 1,
       totalAmount: Number(totalAmount) || 0,
       paidAmount: Number(paidAmount) || 0,
+      ...(!editingBooking ? {
+        initialBenefit,
+        initialTicketWaiver,
+        initialCustomPackageAmount: initialCustomPackageAmount === "" ? null : Number(initialCustomPackageAmount),
+        initialExtraCharges,
+        initialBillingReason,
+      } : {}),
       paymentMethod,
       paymentReceiver,
       transactionId: transactionId.trim() || undefined,
@@ -1043,6 +1079,96 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
                   </div>
                 )}
 
+                {!editingBooking ? (
+                  <div className="rounded-2xl border border-[#DBE6FF] bg-[#F8FAFF] p-4 space-y-3">
+                    <h4 className="text-sm font-extrabold text-[#0B1026]">Free Packages, Tickets & Additional Charges</h4>
+                    <p className="text-xs text-[#667085]">
+                      These initial settings apply per traveller. After creating the booking, open the customer details to customize each person separately.
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="space-y-1 text-xs font-bold text-[#0B1026]">
+                        Package Billing
+                        <select value={initialBenefit} onChange={(e) => setInitialBenefit(e.target.value as TravellerBenefit)}
+                          className="w-full min-h-11 rounded-xl border border-[#DCE5F4] bg-white px-3 py-2 text-xs">
+                          <option value="STANDARD">Regular — Full Package Fare</option>
+                          <option value="FULL_FREE">Fully Free — Package & Extras</option>
+                          <option value="PACKAGE_FREE">Package Free — Extras Paid</option>
+                          <option value="TICKET_FREE">Included Sleeper Ticket Free</option>
+                          <option value="CUSTOM">Custom Package Charge</option>
+                        </select>
+                      </label>
+                      {initialBenefit === "TICKET_FREE" && (
+                        <label className="space-y-1 text-xs font-bold text-[#0B1026]">
+                          Included Ticket Value to Waive (₹)
+                          <input type="number" min="0" step="0.01" value={initialTicketWaiver}
+                            onChange={(e) => setInitialTicketWaiver(Number(e.target.value))}
+                            className="w-full min-h-11 rounded-xl border border-[#DCE5F4] bg-white px-3 py-2" />
+                        </label>
+                      )}
+                      {initialBenefit === "CUSTOM" && (
+                        <label className="space-y-1 text-xs font-bold text-[#0B1026]">
+                          New Package Charge per Person (₹)
+                          <input type="number" min="0" step="0.01" value={initialCustomPackageAmount}
+                            onChange={(e) => setInitialCustomPackageAmount(e.target.value)}
+                            className="w-full min-h-11 rounded-xl border border-[#DCE5F4] bg-white px-3 py-2" />
+                        </label>
+                      )}
+                      {initialBenefit !== "STANDARD" && (
+                        <label className="space-y-1 text-xs font-bold text-[#0B1026] sm:col-span-2">
+                          Free / Special Guest Reason
+                          <input value={initialBillingReason} onChange={(e) => setInitialBillingReason(e.target.value)}
+                            placeholder="e.g. Influencer, special guest, sponsored ticket"
+                            className="w-full min-h-11 rounded-xl border border-[#DCE5F4] bg-white px-3 py-2" />
+                        </label>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-[#0B1026]">Extras (per traveller)</span>
+                      <button type="button" onClick={() => setInitialExtraCharges((items) => [
+                        ...items, { id: crypto.randomUUID(), category: "AC_UPGRADE",
+                          description: "Sleeper to AC upgrade difference", amount: 0, complimentary: false },
+                      ])} className="rounded-xl border border-[#3478F6]/30 bg-white px-3 py-2 text-xs font-bold text-[#3478F6]">
+                        + Add Charge
+                      </button>
+                    </div>
+                    {initialExtraCharges.map((extra) => (
+                      <div key={extra.id} className="grid gap-2 rounded-xl bg-white p-3 border border-[#DCE5F4] sm:grid-cols-12 sm:items-center">
+                        <select value={extra.category}
+                          onChange={(e) => setInitialExtraCharges(items => items.map(item => item.id === extra.id ? {
+                            ...item, category: e.target.value as TravellerExtraCharge["category"],
+                          } : item))} className="rounded-lg border p-2 text-xs sm:col-span-3">
+                          <option value="AC_UPGRADE">AC Upgrade</option><option value="TICKET">Ticket</option>
+                          <option value="VISA">Visa</option><option value="ACCOMMODATION">Stay</option>
+                          <option value="TRANSPORT">Transport</option><option value="OTHER">Other</option>
+                        </select>
+                        <input aria-label="Charge description" value={extra.description}
+                          onChange={(e) => setInitialExtraCharges(items => items.map(item => item.id === extra.id ? {
+                            ...item, description: e.target.value,
+                          } : item))} className="rounded-lg border p-2 text-xs sm:col-span-4" />
+                        <input aria-label="Charge amount" type="number" min="0" step="0.01" value={extra.amount}
+                          onChange={(e) => setInitialExtraCharges(items => items.map(item => item.id === extra.id ? {
+                            ...item, amount: Number(e.target.value),
+                          } : item))} className="rounded-lg border p-2 text-xs sm:col-span-2" />
+                        <label className="flex items-center gap-1 text-xs sm:col-span-2">
+                          <input type="checkbox" checked={Boolean(extra.complimentary)}
+                            onChange={(e) => setInitialExtraCharges(items => items.map(item => item.id === extra.id ? {
+                              ...item, complimentary: e.target.checked,
+                            } : item))} /> Free
+                        </label>
+                        <button type="button" aria-label="Remove charge" onClick={() => setInitialExtraCharges(items => items.filter(item => item.id !== extra.id))}
+                          className="rounded-lg border border-red-200 p-2 text-xs text-red-600 sm:col-span-1">×</button>
+                      </div>
+                    ))}
+                    {initialBill && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white border border-[#DBE6FF] p-3 text-xs">
+                      <span>Base: {formatPrice(initialBill.packagePayable)} • Extras: {formatPrice(initialBill.extrasPayable)}</span>
+                      <strong className="text-[#3478F6]">Total: {formatPrice(initialBill.totalAmount)} • Balance: {formatPrice(initialBill.balanceAmount)}</strong>
+                    </div>}
+                    {initialBillError && <p role="alert" className="text-xs font-bold text-red-600">{initialBillError}</p>}
+                  </div>
+                ) : <p className="rounded-xl border border-[#DBE6FF] bg-[#F8FAFF] p-3 text-xs text-[#3478F6]">
+                  For an existing booking, change free services, tickets, AC upgrades and individual rates on the customer details page.
+                </p>}
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-[#0B1026] mb-1">Number of Travellers *</label>
@@ -1060,7 +1186,7 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
                     <label className="block text-[11px] font-bold text-[#0B1026] mb-1">Total Package Price (₹) <span className="text-gray-400 font-normal">(Auto)</span></label>
                     <input
                       type="text"
-                      value={formatPrice(unitPrice * Math.max(1, travellerCount))}
+                      value={formatPrice(editingBooking ? editingBooking.totalAmount : initialBill?.totalAmount ?? unitPrice * Math.max(1, travellerCount))}
                       readOnly
                       disabled
                       className="w-full bg-[#E8ECF3]/40 border border-[#E8ECF3] rounded-xl px-3.5 py-2 text-xs font-extrabold text-[#3478F6] cursor-not-allowed"
@@ -1083,19 +1209,19 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
                 {/* Calculation Breakdown & Derived Status */}
                 <div className="bg-[#F8FAFC] border border-[#E8ECF3] rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                   <div className="text-gray-600 font-medium">
-                    Breakdown: <strong className="text-[#0B1026]">{formatPrice(unitPrice)} × {travellerCount} {travellerCount > 1 ? "travellers" : "traveller"}</strong> = <span className="font-extrabold text-[#3478F6]">{formatPrice(unitPrice * Math.max(1, travellerCount))}</span>
+                    Breakdown: <strong className="text-[#0B1026]">{travellerCount} {travellerCount > 1 ? "travellers" : "traveller"}</strong> = <span className="font-extrabold text-[#3478F6]">{formatPrice(editingBooking ? editingBooking.totalAmount : initialBill?.totalAmount ?? unitPrice * Math.max(1, travellerCount))}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <span className="text-gray-400 font-bold text-[11px]">Auto Status:</span>
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
-                      paidAmount >= (unitPrice * travellerCount) && (unitPrice * travellerCount) > 0
+                      paidAmount >= (editingBooking ? editingBooking.totalAmount : initialBill?.totalAmount ?? unitPrice * travellerCount) && (editingBooking ? editingBooking.totalAmount : initialBill?.totalAmount ?? unitPrice * travellerCount) > 0
                         ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                         : paidAmount > 0
                         ? "bg-amber-100 text-amber-800 border-amber-200"
                         : "bg-red-100 text-red-800 border-red-200"
                     }`}>
-                      {paidAmount >= (unitPrice * travellerCount) && (unitPrice * travellerCount) > 0
+                      {paidAmount >= (editingBooking ? editingBooking.totalAmount : initialBill?.totalAmount ?? unitPrice * travellerCount) && (editingBooking ? editingBooking.totalAmount : initialBill?.totalAmount ?? unitPrice * travellerCount) > 0
                         ? "Paid"
                         : paidAmount > 0
                         ? "Partially Paid"
