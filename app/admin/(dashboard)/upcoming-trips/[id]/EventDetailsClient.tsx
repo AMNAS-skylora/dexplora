@@ -1184,7 +1184,7 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-[#0B1026] mb-1">Total Package Price (₹) <span className="text-gray-400 font-normal">(Auto)</span></label>
+                    <label className="block text-[11px] font-bold text-[#0B1026] mb-1">Booking Total Including Extras (₹) <span className="text-gray-400 font-normal">(Auto)</span></label>
                     <input
                       type="text"
                       value={formatPrice(editingBooking ? editingBooking.totalAmount : initialBill?.totalAmount ?? unitPrice * Math.max(1, travellerCount))}
