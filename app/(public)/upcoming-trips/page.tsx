@@ -78,7 +78,7 @@ export default async function UpcomingTripsPage() {
                   shortDescription={pkg.shortDescription || pkg.title}
                   coverImage={pkg.coverImage || pkg.imageUrl || "https://images.unsplash.com/photo-1595815771614-ade9d652a65d?auto=format&fit=crop&w=800&q=80"}
                   duration={pkg.duration || "Multi-day"}
-                  price={b.priceOverride ?? pkg.sellingPrice ?? pkg.startingPrice ?? pkg.price}
+                  price={b.priceOverride ?? pkg.price ?? pkg.sellingPrice ?? pkg.startingPrice}
                   originalPrice={pkg.realPrice || pkg.originalPrice}
                   departureLocation={pkg.departureLocation || "Kochi / Kerala"}
                   tripType="UPCOMING DEPARTURE"
