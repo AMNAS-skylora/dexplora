@@ -59,7 +59,8 @@ const WEEKDAY_NAMES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 function parseLocalDate(dateInput: Date | string): Date {
   if (!dateInput) return new Date();
-  if (dateInput instanceof Date) return new Date(dateInput.getTime());
+  // Normalize UTC midnight (database dates) to local calendar dates without timezone shifts.
+  if (dateInput instanceof Date) return parseLocalDate(dateInput.toISOString());
 
   const str = String(dateInput);
   const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -122,6 +123,10 @@ export function PackageDeparturesCalendar({
     return map;
   }, [activeBatches]);
 
+  const canBookBatch = (batch: PackageDepartureBatch) =>
+    batch.availableSeats > 0 &&
+    !["CANCELLED", "COMPLETED", "SOLD_OUT"].includes(batch.status);
+
   // Initial target batch if initialDepartureId matches
   const targetInitialBatch = useMemo(() => {
     if (!initialDepartureId) return null;
@@ -145,6 +150,11 @@ export function PackageDeparturesCalendar({
     if (activeBatches.length > 0) return activeBatches[0];
     return null;
   });
+
+  const sameDateBatches = useMemo(
+    () => selectedBatch ? batchesByDateKey.get(getDateKey(selectedBatch.startDate)) || [] : [],
+    [batchesByDateKey, selectedBatch]
+  );
 
   // Auto-scroll to section if initialDepartureId was passed
   useEffect(() => {
@@ -202,7 +212,7 @@ export function PackageDeparturesCalendar({
   const [isBookingLoading, setIsBookingLoading] = useState(false);
 
   const handleBookSeat = async (batch: PackageDepartureBatch) => {
-    if (isBookingLoading) return;
+    if (isBookingLoading || !canBookBatch(batch)) return;
     setIsBookingLoading(true);
 
     try {
@@ -210,7 +220,7 @@ export function PackageDeparturesCalendar({
         packageData: {
           title: packageTitle,
           slug: packageSlug,
-          price: batch.priceOverride || startingPrice,
+          price: batch.priceOverride ?? startingPrice,
           destination: destinationName,
         },
         selectedDeparture: {
@@ -218,7 +228,7 @@ export function PackageDeparturesCalendar({
           batchName: batch.batchName,
           startDate: batch.startDate,
           endDate: batch.endDate,
-          price: batch.priceOverride || startingPrice,
+          price: batch.priceOverride ?? startingPrice,
           availableSeats: batch.availableSeats,
           totalSeats: batch.totalSeats,
         },
@@ -358,7 +368,9 @@ export function PackageDeparturesCalendar({
                 const isToday = isCurrentMonthView && dayNum === todayDateNumber;
                 const dayBatches = getBatchesForDay(dayNum);
                 const hasDeparture = dayBatches.length > 0;
-                const firstBatch = hasDeparture ? dayBatches[0] : null;
+                const firstBatch = hasDeparture
+                  ? (dayBatches.find((b) => canBookBatch(b)) || dayBatches[0])
+                  : null;
 
                 const isSelected =
                   selectedBatch &&
@@ -388,11 +400,11 @@ export function PackageDeparturesCalendar({
                     <span className="text-xs sm:text-sm leading-none">{dayNum}</span>
 
                     {hasDeparture && (
-                      <span
-                        className={`absolute bottom-1 w-2 h-2 rounded-full ${
-                          isSelected ? "bg-white" : "bg-[#3478F6]"
-                        }`}
-                      />
+                      <span className={`absolute bottom-0.5 flex items-center justify-center min-w-4 h-4 px-1 text-[9px] font-extrabold rounded-full ${
+                        isSelected ? "bg-white text-[#3478F6]" : "bg-[#3478F6] text-white"
+                      }`}>
+                        {dayBatches.length}
+                      </span>
                     )}
                   </button>
                 );
@@ -421,6 +433,47 @@ export function PackageDeparturesCalendar({
               </div>
             </div>
           </div>
+
+          {sameDateBatches.length > 1 && (
+            <div className="space-y-2 rounded-[18px] border border-[#DBE6FF] bg-[#F8FAFF] p-4" aria-label="Departures on selected date">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-extrabold text-[#0B1026]">
+                  {sameDateBatches.length} departures on {selectedBatch ? formatDate(selectedBatch.startDate) : "this date"}
+                </h3>
+                <span className="text-[11px] text-[#64748B]">Select a specific departure</span>
+              </div>
+              <div className="grid gap-2">
+                {sameDateBatches.map((batch, idx) => (
+                  <button
+                    key={batch.id}
+                    type="button"
+                    onClick={() => setSelectedBatch(batch)}
+                    aria-pressed={selectedBatch?.id === batch.id}
+                    className={`flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-colors ${
+                      selectedBatch?.id === batch.id
+                        ? "border-[#3478F6] bg-white ring-1 ring-[#3478F6]/20"
+                        : "border-[#DBE6FF] bg-white/70 hover:bg-white"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold text-[#0B1026]">
+                        {batch.batchName || `Departure ${idx + 1}`}
+                      </p>
+                      <p className="mt-1 text-[11px] text-[#64748B]">
+                        {canBookBatch(batch) ? `${batch.availableSeats} seats available` : "Sold out / bookings closed"}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-extrabold text-[#3478F6]">
+                        {formatPrice(batch.priceOverride ?? startingPrice)}
+                      </p>
+                      <p className="text-[10px] text-[#64748B]">per person</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Departure Information Preview Card */}
           {selectedBatch && (
@@ -483,23 +536,25 @@ export function PackageDeparturesCalendar({
                   </span>
                   <div className="flex items-baseline gap-1.5 mt-0.5">
                     <span className="text-2xl sm:text-3xl font-extrabold text-[#3478F6]">
-                      {formatPrice(selectedBatch.priceOverride || startingPrice)}
+                      {formatPrice(selectedBatch.priceOverride ?? startingPrice)}
                     </span>
                     <span className="text-xs font-semibold text-[#64748B]">/ person</span>
                   </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-2.5">
-                  <Link
-                    href={`/book-now?packageId=${packageSlug}&batchId=${selectedBatch.id}`}
-                    className="w-full sm:w-auto h-[48px] px-6 bg-white hover:bg-gray-50 border border-[#3478F6] text-[#3478F6] font-bold text-sm rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
-                  >
-                    <span>Reserve via Form</span>
-                  </Link>
+                  {canBookBatch(selectedBatch) && (
+                    <Link
+                      href={`/book-now?packageId=${packageSlug}&batchId=${selectedBatch.id}`}
+                      className="w-full sm:w-auto h-[48px] px-6 bg-white hover:bg-gray-50 border border-[#3478F6] text-[#3478F6] font-bold text-sm rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                    >
+                      <span>Reserve via Form</span>
+                    </Link>
+                  )}
 
                   <button
                     type="button"
-                    disabled={isBookingLoading}
+                    disabled={isBookingLoading || !canBookBatch(selectedBatch)}
                     onClick={() => handleBookSeat(selectedBatch)}
                     className="w-full sm:w-auto h-[48px] px-7 bg-[#3478F6] hover:bg-[#2563EB] disabled:bg-[#3478F6]/70 text-white font-extrabold text-sm rounded-xl flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer disabled:cursor-wait shadow-md"
                   >
@@ -510,7 +565,7 @@ export function PackageDeparturesCalendar({
                       </>
                     ) : (
                       <>
-                        <span>Book Your Seat</span>
+                        <span>{canBookBatch(selectedBatch) ? "Book Your Seat" : "Fully Booked"}</span>
                         <ArrowRight className="w-4.5 h-4.5" />
                       </>
                     )}
