@@ -331,11 +331,11 @@ async function populatePackageRelations(docs: any, include: any) {
   items.forEach((item: any) => {
     if (!item) return;
     if (!Array.isArray(item.batches)) item.batches = [];
-    if (!Array.isArray(item.images)) item.images = Array.isArray(item.gallery) ? item.gallery : [];
-    if (!Array.isArray(item.itineraries)) item.itineraries = Array.isArray(item.itinerary) ? item.itinerary : [];
-    if (!Array.isArray(item.inclusions)) item.inclusions = [];
-    if (!Array.isArray(item.exclusions)) item.exclusions = [];
-    if (!Array.isArray(item.faqs)) item.faqs = [];
+    if (!Array.isArray(item.images)) item.images = Array.isArray(item.images?.create) ? item.images.create : (Array.isArray(item.gallery) ? item.gallery : []);
+    if (!Array.isArray(item.itineraries)) item.itineraries = Array.isArray(item.itineraries?.create) ? item.itineraries.create : (Array.isArray(item.itinerary) ? item.itinerary : []);
+    if (!Array.isArray(item.inclusions)) item.inclusions = Array.isArray(item.inclusions?.create) ? item.inclusions.create : ([]);
+    if (!Array.isArray(item.exclusions)) item.exclusions = Array.isArray(item.exclusions?.create) ? item.exclusions.create : ([]);
+    if (!Array.isArray(item.faqs)) item.faqs = Array.isArray(item.faqs?.create) ? item.faqs.create : ([]);
   });
 
   return isArray ? items : items[0];
@@ -495,6 +495,18 @@ export function isDbAvailable(): boolean {
   const rawUri = process.env.MONGODB_URI || process.env.DATABASE_URL;
   const uri = rawUri?.trim();
   return Boolean(uri && (uri.startsWith("mongodb://") || uri.startsWith("mongodb+srv://")));
+}
+
+function normalizePackageEmbeddedRelations(data: Record<string, any>) {
+  const fields = ["images", "itineraries", "inclusions", "exclusions", "faqs"];
+  for (const field of fields) {
+    if (!(field in data)) continue;
+    const value = data[field];
+    if (Array.isArray(value)) data[field] = value;
+    else if (value && Array.isArray(value.create)) data[field] = value.create;
+    else if (value && Array.isArray(value.set)) data[field] = value.set;
+  }
+  return data;
 }
 
 function createCollectionWrapper(collectionName: string) {
