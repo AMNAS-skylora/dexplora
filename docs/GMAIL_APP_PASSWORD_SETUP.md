@@ -11,6 +11,7 @@ SMTP_USER=your-gmail-account@gmail.com
 SMTP_APP_PASSWORD=your-16-character-google-app-password
 SMTP_FROM=your-gmail-account@gmail.com
 NEXT_PUBLIC_SITE_URL=https://your-live-domain.com
+EMAIL_AUTOMATION_ENABLED=false
 ```
 
 `SMTP_FROM` must be the same Gmail address as `SMTP_USER` to avoid sender mismatch. The SMTP_HOST and SMTP_PORT variables are unnecessary; the sender is deliberately fixed to smtp.gmail.com:465.
@@ -32,6 +33,10 @@ Open **Admin → Email Notifications → Send test to my admin email**. Only ADM
 
 A successful test means Gmail accepted the SMTP transaction. Inbox delivery or spam placement is not guaranteed. Gmail sending limits, Google account eligibility, and hosting environment outbound TLS may apply.
 
-## Scope and next steps
+## Automatic booking and payment messages
 
-The existing admin SMTP test is integrated. Automated booking and payment event triggers, scheduled reminders, recipient opt-outs, retries and campaign sending are separate workflows. Do not advertise them as enabled until implemented and tested. Existing Resend scaffolding on the experimental feature branch is not used by the production Gmail test.
+Booking confirmation and payment receipt hooks are included in the admin booking/payment save flow. They only attempt to send when **EMAIL_AUTOMATION_ENABLED=true** and Gmail SMTP is configured. Start with `false` and verify an admin test before enabling. Emails are skipped when a booking has no valid email address or its `emailOptOut` is set to true. Each SMTP attempt is logged in MongoDB `EmailDeliveryLogs`; failures do not reverse the saved booking or payment.
+
+**Limitations:** There is no scheduled balance-reminder job or durable retry queue yet. SMTP accepted status does not confirm inbox delivery. The admin test can run while automation is disabled.
+
+The feature branch's manual campaign action also uses Gmail SMTP, but that action has not been released into the production admin UI. Do not describe mass campaigns or scheduled reminders as active.
