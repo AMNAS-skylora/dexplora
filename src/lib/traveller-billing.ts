@@ -160,7 +160,7 @@ export function calculateBookingBilling(input: BookingBillingInput) {
     packagePayable: money(packagePayable, "package payable"),
     extrasListTotal: money(extrasListTotal, "additional charges"),
     extrasPayable: money(extrasPayable, "additional payable"),
-    discountAmount: money(packageListTotal + extrasListTotal - totalAmount, "complimentary discount"),
+    discountAmount: money(Math.max(0, packageListTotal + extrasListTotal - totalAmount), "complimentary discount"),
     totalAmount, paidAmount: paid, balanceAmount, creditAmount,
     paymentStatus: totalAmount === 0 && paid === 0 ? "Free" :
       paid >= totalAmount ? "Paid" : paid > 0 ? "Partially Paid" : "Pending",
