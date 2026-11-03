@@ -76,7 +76,7 @@ export function getBookingBillingRows(booking: {
   customerName?: string;
   travellers?: Array<{ name?: string }>;
   billingRows?: TravellerBillingRow[];
-}): TravellerBillingRow[] {
+}, defaultPackageFare = 0): TravellerBillingRow[] {
   const count = Math.max(1, Number(booking.travellerCount) || 1);
   if (Array.isArray(booking.billingRows) && booking.billingRows.length) {
     return booking.billingRows.map((row, i) => ({
@@ -86,8 +86,24 @@ export function getBookingBillingRows(booking: {
   const named = (Array.isArray(booking.travellers) ? booking.travellers : []).map((t) => String(t.name || ""));
   if (named.length < count) named.unshift(String(booking.customerName || "Traveller"));
   const snapshot = booking.unitPrice != null && Number(booking.unitPrice) > 0
-    ? Number(booking.unitPrice) : Number(booking.totalAmount || 0) / count;
-  return createInitialBillingRows(count, snapshot, named);
+    ? Number(booking.unitPrice) : (defaultPackageFare > 0 ? defaultPackageFare : Number(booking.totalAmount || 0) / count);
+  const rows = createInitialBillingRows(count, snapshot, named);
+  const previousTotal = Math.round(Number(booking.totalAmount || 0) * 100);
+  const standardTotal = Math.round(snapshot * 100) * count;
+  if (previousTotal === 0 && standardTotal > 0) {
+    return rows.map(row => ({ ...row, benefit: "FULL_FREE" as TravellerBenefit, reason: "Legacy complimentary booking" }));
+  }
+  // Protect historic discounted totals when migrating a booking to the new editor.
+  if (previousTotal !== standardTotal && previousTotal > 0) {
+    const regularCents = Math.floor(previousTotal / count);
+    return rows.map((row, index) => ({
+      ...row,
+      benefit: "CUSTOM" as TravellerBenefit,
+      customPackageAmount: (index === count - 1
+        ? previousTotal - regularCents * (count - 1) : regularCents) / 100,
+    }));
+  }
+  return rows;
 }
 
 export function calculateBookingBilling(input: BookingBillingInput) {
