@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { formatDate, formatPrice } from "@/lib/utils";
@@ -76,6 +77,7 @@ interface UpcomingTripManagerClientProps {
 }
 
 export function UpcomingTripManagerClient({ batches: initialBatches, packages }: UpcomingTripManagerClientProps) {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -89,11 +91,12 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [totalSeats, setTotalSeats] = useState(30);
+  const [priceOverride, setPriceOverride] = useState("");
   const [status, setStatus] = useState("OPEN");
   const [boardingPoint, setBoardingPoint] = useState("");
   const [notes, setNotes] = useState("");
 
-  const handleOpenCreateModal = () => {
+  const handleOpenCreateModal = (sameDateAs?: EnrichedBatch) => {
     setEditingBatch(null);
     const defaultPkg = packages[0];
     if (defaultPkg) {
@@ -101,9 +104,13 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
       setBoardingPoint(defaultPkg.departureLocation || "Kerala");
     }
     setBatchName("");
-    setStartDate("");
-    setEndDate("");
+    // Start a new independent departure, optionally reusing the same dates.
+    // The package and per-departure rate remain editable.
+    setSelectedPackageId(sameDateAs?.packageId || packages[0]?.id || "");
+    setStartDate(sameDateAs ? toSafeInputDate(sameDateAs.startDate) : "");
+    setEndDate(sameDateAs ? toSafeInputDate(sameDateAs.endDate) : "");
     setTotalSeats(30);
+    setPriceOverride("");
     setStatus("OPEN");
     setNotes("");
     setError(null);
@@ -117,6 +124,7 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
     setStartDate(toSafeInputDate(b.startDate));
     setEndDate(toSafeInputDate(b.endDate));
     setTotalSeats(b.totalSeats);
+    setPriceOverride(b.priceOverride == null ? "" : String(b.priceOverride));
     setStatus(b.status);
     setBoardingPoint(b.boardingPoint || "");
     setNotes(b.notes || "");
@@ -135,52 +143,48 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!selectedPackageId) return setError("Please select a package.");
+    if (!startDate || !endDate) return setError("Select both start and end dates.");
+    if (endDate < startDate) return setError("End date cannot be before start date.");
+    if (!Number.isSafeInteger(totalSeats) || totalSeats < 1) return setError("Seats must be a positive whole number.");
+    if (editingBatch && totalSeats < editingBatch.bookedSeats) {
+      return setError("Cannot reduce capacity below booked seats.");
+    }
 
-    if (!selectedPackageId) {
-      setError("Please select a package.");
-      return;
+    const customRate = priceOverride.trim() === "" ? null : Number(priceOverride);
+    const packageRate = Number(packages.find((p) => p.id === selectedPackageId)?.price || 0);
+    if (customRate !== null && (!Number.isFinite(customRate) || customRate <= 0)) {
+      return setError("Custom departure rate must be greater than zero.");
     }
-    if (!startDate || !endDate) {
-      setError("Start date and End date are required.");
-      return;
-    }
+    if ((customRate ?? packageRate) <= 0) return setError("Set a positive package rate or custom departure rate.");
 
     setLoading(true);
-
-    if (editingBatch) {
-      const res = await updateTripBatch(editingBatch.id, {
+    try {
+      const data = {
         packageId: selectedPackageId,
-        batchName: batchName.trim() || undefined,
+        batchName: batchName.trim(),
         startDate,
         endDate,
         totalSeats,
+        priceOverride: customRate,
         status: status as any,
-        boardingPoint: boardingPoint.trim() || undefined,
-        notes: notes.trim() || undefined,
-      });
-      setLoading(false);
+        boardingPoint: boardingPoint.trim(),
+        notes: notes.trim(),
+      };
+      const res = editingBatch
+        ? await updateTripBatch(editingBatch.id, data)
+        : await createTripBatch(data);
       if (res.error) {
         setError(res.error);
       } else {
         setIsCreateModalOpen(false);
+        router.refresh();
       }
-    } else {
-      const res = await createTripBatch({
-        packageId: selectedPackageId,
-        batchName: batchName.trim() || undefined,
-        startDate,
-        endDate,
-        totalSeats,
-        status: status as any,
-        boardingPoint: boardingPoint.trim() || undefined,
-        notes: notes.trim() || undefined,
-      });
+    } catch (err) {
+      console.error("Departure save failed:", err);
+      setError("Could not save departure. Your form data is still here; try again.");
+    } finally {
       setLoading(false);
-      if (res.error) {
-        setError(res.error);
-      } else {
-        setIsCreateModalOpen(false);
-      }
     }
   };
 
@@ -305,7 +309,7 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
           </div>
 
           <button
-            onClick={handleOpenCreateModal}
+            onClick={() => handleOpenCreateModal()}
             className="bg-[#3478F6] hover:bg-[#2563EB] text-white px-5 py-2.5 rounded-2xl text-xs font-bold shadow-md transition-colors flex items-center gap-2 min-h-[42px] cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -343,6 +347,7 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
                       <span className="text-xs font-bold text-[#3478F6] bg-[#3478F6]/10 px-2.5 py-0.5 rounded-lg">
                         {b.batchName || "Standard Departure"}
                       </span>
+                      <span className="text-xs font-bold text-[#1769e0]">{formatPrice(b.priceOverride ?? packages.find((p) => p.id === b.packageId)?.price ?? 0)} / person</span>
                       <span className="text-xs text-gray-500 font-semibold flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
                         {b.duration}
@@ -414,6 +419,16 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
                     </Link>
 
                     <button
+                      type="button"
+                      onClick={() => handleOpenCreateModal(b)}
+                      className="px-3 py-2 rounded-xl text-[#3478F6] bg-[#F3F7FF] hover:bg-blue-100 text-xs font-bold border border-[#E8ECF3] min-h-[38px]"
+                      title="Create another independent departure on these dates"
+                    >
+                      + Same Date
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => handleOpenEditModal(b)}
                       className="p-2 text-gray-600 hover:text-[#3478F6] hover:bg-[#F3F7FF] rounded-xl transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center cursor-pointer border border-[#E8ECF3]"
                       title="Edit Batch"
@@ -423,9 +438,10 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
 
                     <form
                       action={async () => {
-                        if (confirm(`Delete departure batch "${b.batchName || b.packageTitle}"?`)) {
-                          await deleteTripBatch(b.id);
-                        }
+                        if (!confirm(`Delete departure batch "${b.batchName || b.packageTitle}"?`)) return;
+                        const result = await deleteTripBatch(b.id);
+                        if (result.error) alert(result.error);
+                        else router.refresh();
                       }}
                     >
                       <button
@@ -475,6 +491,9 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
             )}
 
             <form onSubmit={handleFormSubmit} className="space-y-4">
+              <p className="rounded-xl bg-[#F3F7FF] border border-[#DBE6FF] p-3 text-xs text-[#3478F6] font-semibold">
+                Any number of departures can share the same date. Each departure has its own rate, capacity and bookings.
+              </p>
               {/* Select Package */}
               <div>
                 <label className="block text-xs font-bold text-[#0B1026] mb-1">Select Package *</label>
@@ -527,6 +546,21 @@ export function UpcomingTripManagerClient({ batches: initialBatches, packages }:
                     className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#0B1026] outline-none focus:border-[#3478F6]"
                   />
                 </div>
+              </div>
+
+              {/* Departure-specific rate. Empty means inherit the package's default rate. */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-[#0B1026] mb-1">Rate per Person (₹)</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={priceOverride}
+                  onChange={(e) => setPriceOverride(e.target.value)}
+                  placeholder={String(packages.find((p) => p.id === selectedPackageId)?.price ?? 0)}
+                  className="w-full bg-[#F3F7FF] border border-[#E8ECF3] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#0B1026] outline-none focus:border-[#3478F6] min-h-[44px]"
+                />
+                <p className="text-[11px] text-gray-500">Leave blank for package rate ({formatPrice(packages.find((p) => p.id === selectedPackageId)?.price ?? 0)}). Changing this rate does not modify other departures.</p>
               </div>
 
               {/* Seats & Status */}
