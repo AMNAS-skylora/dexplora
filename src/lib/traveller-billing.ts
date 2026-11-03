@@ -128,6 +128,7 @@ export function calculateBookingBilling(input: BookingBillingInput) {
       case "PACKAGE_FREE":
         payable = 0; break;
       case "TICKET_FREE":
+        if (ticketValue <= 0) throw new Error("Enter the included ticket value being waived for the free ticket.");
         payable = money(baseFare - ticketValue, "package less complimentary ticket"); break;
       case "CUSTOM":
         if (row.customPackageAmount == null) throw new Error("Enter the custom package charge.");
