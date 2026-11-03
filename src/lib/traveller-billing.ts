@@ -18,6 +18,7 @@ export interface TravellerBillingRow {
   slot: number;
   name: string;
   benefit: TravellerBenefit;
+  travelClass?: "SEATER" | "SLEEPER" | "AC" | "OTHER";
   baseFare: number;
   /** Part of the base package fare attributable to an included sleeper/other ticket. */
   includedTicketValue: number;
@@ -58,6 +59,7 @@ export function createInitialBillingRows(
     slot: index + 1,
     name: String(names[index] || `Traveller ${index + 1}`).trim(),
     benefit: initial?.benefit ?? "STANDARD",
+    travelClass: "SLEEPER",
     baseFare: fare,
     includedTicketValue: initial?.includedTicketValue ?? 0,
     customPackageAmount: initial?.customPackageAmount ?? null,
@@ -160,6 +162,7 @@ export function calculateBookingBilling(input: BookingBillingInput) {
     extrasPayable += extraDue;
     return {
       slot: index + 1, name, benefit: row.benefit,
+      travelClass: ["SEATER", "SLEEPER", "AC", "OTHER"].includes(String(row.travelClass)) ? row.travelClass : "SLEEPER",
       baseFare, includedTicketValue: ticketValue,
       customPackageAmount: row.customPackageAmount ?? null,
       extras,
