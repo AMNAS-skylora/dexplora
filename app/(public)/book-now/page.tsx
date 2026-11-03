@@ -15,7 +15,7 @@ export default async function BookNowPage({ searchParams }: BookNowPageProps) {
   let packages: any[] = [];
   try {
     const packageRecords = await db.package.findMany({
-      where: { status: "PUBLISHED" },
+      where: { status: { in: ["PUBLISHED", "SOLD_OUT"] } },
       include: { batches: true },
       orderBy: { displayOrder: "asc" },
     });
@@ -23,6 +23,7 @@ export default async function BookNowPage({ searchParams }: BookNowPageProps) {
     now.setUTCHours(0, 0, 0, 0);
     packages = (Array.isArray(packageRecords) ? packageRecords : []).map((pkg: any) => ({
       id: pkg.id,
+      status: pkg.status,
       title: pkg.title,
       slug: pkg.slug,
       price: Number(pkg.price) || 0,
@@ -42,7 +43,12 @@ export default async function BookNowPage({ searchParams }: BookNowPageProps) {
           availableSeats: batch.availableSeats,
           status: batch.status,
         })),
-    }));
+    })).filter((pkg: any) =>
+      pkg.status === "PUBLISHED" ||
+      pkg.batches.some((batch: any) =>
+        batch.availableSeats > 0 && batch.status !== "SOLD_OUT"
+      )
+    );
   } catch (error) {
     console.error("Error fetching packages for booking form:", error);
   }
