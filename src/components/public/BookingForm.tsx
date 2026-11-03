@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBookingEnquiry } from "@/actions";
 import { CheckCircle2, AlertCircle, Send } from "lucide-react";
+import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
 
 interface SubmittedBookingInfo {
@@ -17,11 +18,16 @@ interface BookingFormProps {
     id: string;
     title: string;
     slug: string;
+    price: number;
     batches: Array<{
       id: string;
       batchName?: string | null;
       startDate: Date | string;
       endDate: Date | string;
+      priceOverride?: number | null;
+      availableSeats: number;
+      totalSeats: number;
+      status: string;
     }>;
   }>;
   initialPackageSlug?: string;
@@ -35,14 +41,24 @@ export function BookingForm({
   initialBatchId,
   whatsappNumber,
 }: BookingFormProps) {
-  const defaultPkg = packages.find((p) => p.slug === initialPackageSlug) || packages[0];
+  const defaultPkg = packages.find((p) => p.slug === initialPackageSlug)
+    || packages.find((p) => p.batches.some((b) => b.id === initialBatchId))
+    || packages[0];
   const [selectedPackageId, setSelectedPackageId] = useState(defaultPkg?.id || "");
-  const [selectedBatchId, setSelectedBatchId] = useState(initialBatchId || "");
+  const [selectedBatchId, setSelectedBatchId] = useState(
+    defaultPkg?.batches.some((b) =>
+      b.id === initialBatchId &&
+      b.availableSeats > 0 &&
+      !["SOLD_OUT", "CANCELLED", "COMPLETED"].includes(b.status)
+    ) ? initialBatchId || "" : ""
+  );
   const [loading, setLoading] = useState(false);
   const [submittedBooking, setSubmittedBooking] = useState<SubmittedBookingInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const selectedPkgObj = packages.find((p) => p.id === selectedPackageId);
+  const selectedBatch = selectedPkgObj?.batches.find((b) => b.id === selectedBatchId);
+  const selectedRate = selectedBatch ? selectedBatch.priceOverride ?? selectedPkgObj?.price ?? 0 : selectedPkgObj?.price ?? 0;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -222,14 +238,28 @@ export function BookingForm({
               className="w-full bg-[#F3F7FF] border border-[#E8ECF3] text-xs font-bold text-[#0B1026] rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-[#3478F6]"
             >
               <option value="">Choose Batch (Optional)</option>
-              {selectedPkgObj?.batches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.batchName || "Departure"} ({new Date(b.startDate).toLocaleDateString("en-IN")})
-                </option>
-              ))}
+              {selectedPkgObj?.batches.map((b, index) => {
+                const closed = b.availableSeats <= 0 || ["SOLD_OUT", "CANCELLED", "COMPLETED"].includes(b.status);
+                const rate = b.priceOverride ?? selectedPkgObj.price;
+                return (
+                  <option key={b.id} value={b.id} disabled={closed}>
+                    {new Date(b.startDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })}
+                    {" — "}{b.batchName || `Departure ${index + 1}`}
+                    {" — "}{formatPrice(rate)} / person
+                    {" — "}{closed ? "Sold Out" : `${b.availableSeats} seats left`}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>
+
+        {selectedBatch && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#DBE6FF] bg-[#F3F7FF] px-4 py-3 text-xs font-semibold text-[#0B1026]">
+            <span>{selectedBatch.batchName || "Selected departure"} • {selectedBatch.availableSeats} seats left</span>
+            <span className="text-[#3478F6]">{formatPrice(selectedRate)} / person</span>
+          </div>
+        )}
 
         {/* Travelers Breakdown */}
         <div className="grid grid-cols-3 gap-3">
