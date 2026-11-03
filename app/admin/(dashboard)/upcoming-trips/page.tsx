@@ -15,7 +15,7 @@ export default async function AdminUpcomingTripsPage() {
       orderBy: { startDate: "asc" },
     }),
     db.package.findMany({
-      where: { status: "PUBLISHED" },
+      where: { status: { in: ["PUBLISHED", "SOLD_OUT"] } },
       select: { id: true, title: true, price: true, duration: true, coverImage: true, departureLocation: true, arrivalLocation: true },
     }),
   ]);
@@ -36,7 +36,7 @@ export default async function AdminUpcomingTripsPage() {
     const availableSeats = Math.max(0, totalSeats - bookedSeats);
 
     let derivedStatus = b.status || "OPEN";
-    if (availableSeats === 0) derivedStatus = "SOLD_OUT";
+    if (availableSeats === 0 && !["CANCELLED", "COMPLETED"].includes(derivedStatus)) derivedStatus = "SOLD_OUT";
 
     return {
       ...b,
