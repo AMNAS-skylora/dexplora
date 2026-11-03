@@ -144,7 +144,7 @@ export function DeparturesCalendar({ batches = [], customEvents = [] }: Departur
       const ratio = total > 0 ? avail / total : 0;
 
       let calcStatus = b.status || "OPEN";
-      if (b.status !== "CANCELLED" && b.status !== "COMPLETED") {
+      if (!["CANCELLED", "COMPLETED", "SOLD_OUT"].includes(b.status)) {
         if (avail <= 0) calcStatus = "SOLD_OUT";
         else if (ratio > 0.5) calcStatus = "OPEN";
         else if (ratio >= 0.25) calcStatus = "FILLING_FAST";
