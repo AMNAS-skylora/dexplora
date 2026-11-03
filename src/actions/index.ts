@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { buildPackageEmbeddedRelations } from "@/lib/package-relations";
 import { setAdminSessionCookie, clearAdminSessionCookie, getAdminSession } from "@/lib/auth";
 import { generateBookingRef, slugify } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
@@ -413,46 +414,13 @@ export async function createPackage(data: PackageInputData) {
         displayOrder: Number(data.displayOrder) || 0,
         seoTitle: data.seoTitle || data.title,
         seoDescription: data.seoDescription || data.shortDescription,
-        images: {
-          create: (data.images || []).map((img: any, idx: number) => ({
-            url: img.url,
-            caption: img.caption || null,
-            displayOrder: idx,
-          })),
-        },
-        itineraries: {
-          create: (data.itineraries || []).map((it: any, idx: number) => ({
-            dayNumber: Number(it.dayNumber) || idx + 1,
-            title: it.title,
-            description: it.description,
-            imageUrl: it.imageUrl || it.image || null,
-            image: it.imageUrl || it.image || null,
-            meals: it.meals || null,
-            accommodation: it.accommodation || null,
-            displayOrder: idx,
-          })),
-        },
-        inclusions: {
-          create: (data.inclusions || []).map((inc: any, idx: number) => ({
-            text: typeof inc === "string" ? inc : inc.text,
-            displayOrder: idx,
-          })),
-        },
-        exclusions: {
-          create: (data.exclusions || []).map((exc: any, idx: number) => ({
-            text: typeof exc === "string" ? exc : exc.text,
-            displayOrder: idx,
-          })),
-        },
-        faqs: {
-          create: (data.faqs || []).map((faq: any, idx: number) => ({
-            question: faq.question,
-            answer: faq.answer,
-            displayOrder: idx,
-          })),
-        },
+        ...buildPackageEmbeddedRelations(data),
       },
     });
+
+    if (!newPkg || !Array.isArray(newPkg.itineraries) || newPkg.itineraries.length !== (data.itineraries ?? []).length) {
+      throw new Error("Itinerary persistence verification failed");
+    }
 
     revalidatePath("/");
     revalidatePath("/packages");
@@ -484,13 +452,6 @@ export async function updatePackage(id: string, data: PackageInputData) {
     }
     const packageSlug = normalizedSlug;
 
-    // Clear old relations to replace with new ones
-    await db.packageItinerary.deleteMany({ where: { packageId: id } });
-    await db.packageInclusion.deleteMany({ where: { packageId: id } });
-    await db.packageExclusion.deleteMany({ where: { packageId: id } });
-    await db.packageFAQ.deleteMany({ where: { packageId: id } });
-    await db.packageImage.deleteMany({ where: { packageId: id } });
-
     const updatedPkg = await db.package.update({
       where: { id },
       data: {
@@ -504,6 +465,7 @@ export async function updatePackage(id: string, data: PackageInputData) {
         duration: data.duration,
         price: Number(data.price),
         originalPrice: data.originalPrice ? Number(data.originalPrice) : null,
+        expensePerPerson: Math.max(0, Number(data.expensePerPerson) || 0),
         departureLocation: data.departureLocation,
         arrivalLocation: data.arrivalLocation,
         accommodation: data.accommodation,
@@ -516,46 +478,13 @@ export async function updatePackage(id: string, data: PackageInputData) {
         displayOrder: Number(data.displayOrder) || 0,
         seoTitle: data.seoTitle || data.title,
         seoDescription: data.seoDescription || data.shortDescription,
-        images: {
-          create: (data.images || []).map((img, idx: number) => ({
-            url: img.url,
-            caption: img.caption || null,
-            displayOrder: idx,
-          })),
-        },
-        itineraries: {
-          create: (data.itineraries || []).map((it, idx: number) => ({
-            dayNumber: Number(it.dayNumber) || idx + 1,
-            title: it.title,
-            description: it.description,
-            imageUrl: it.imageUrl || it.image || null,
-            image: it.imageUrl || it.image || null,
-            meals: it.meals || null,
-            accommodation: it.accommodation || null,
-            displayOrder: idx,
-          })),
-        },
-        inclusions: {
-          create: (data.inclusions || []).map((inc, idx: number) => ({
-            text: typeof inc === "string" ? inc : inc.text,
-            displayOrder: idx,
-          })),
-        },
-        exclusions: {
-          create: (data.exclusions || []).map((exc, idx: number) => ({
-            text: typeof exc === "string" ? exc : exc.text,
-            displayOrder: idx,
-          })),
-        },
-        faqs: {
-          create: (data.faqs || []).map((faq, idx: number) => ({
-            question: faq.question,
-            answer: faq.answer,
-            displayOrder: idx,
-          })),
-        },
+        ...buildPackageEmbeddedRelations(data),
       },
     });
+
+    if (!updatedPkg || !Array.isArray(updatedPkg.itineraries) || updatedPkg.itineraries.length !== (data.itineraries ?? []).length) {
+      throw new Error("Itinerary persistence verification failed");
+    }
 
     revalidatePath("/");
     revalidatePath("/packages");
