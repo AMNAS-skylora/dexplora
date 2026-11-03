@@ -1104,13 +1104,42 @@ export async function addTravellerToBookingList(
 
     const existingTravellers = Array.isArray(booking.travellers) ? booking.travellers : [];
     const updatedTravellers = [...existingTravellers, newTraveller];
-    const newTravellerCount = updatedTravellers.length;
+    // Existing bookings may have reserved multiple seats before traveller names were entered.
+    const newTravellerCount = Math.max(Number(booking.travellerCount) || 1, updatedTravellers.length);
+    const batch = booking.tripBatchId
+      ? await db.tripBatch.findUnique({ where: { id: booking.tripBatchId }, include: { package: true } })
+      : null;
+    if (!batch) return { error: "Departure not found." };
+    const previousBookings = await db.booking.findMany({ where: { tripBatchId: booking.tripBatchId } });
+    const others = previousBookings
+      .filter((other: any) => other.id !== bookingId && String(other.bookingStatus || other.status || "").toUpperCase() !== "CANCELLED")
+      .reduce((sum: number, other: any) => sum + Math.max(1, Number(other.travellerCount) || 1), 0);
+    if (String(booking.bookingStatus || booking.status).toUpperCase() !== "CANCELLED" &&
+        others + newTravellerCount > Number(batch.totalSeats || 0)) {
+      return { error: "This departure does not have enough seats for another traveller." };
+    }
+    const base = Number(booking.unitPrice) || Number(batch.priceOverride ?? batch.package?.price ?? 0);
+    const rows = getBookingBillingRows(booking, base).slice(0, newTravellerCount);
+    while (rows.length < newTravellerCount) {
+      rows.push({ ...createInitialBillingRows(1, base, [newTraveller.name])[0], slot: rows.length + 1 });
+    }
+    const history = Array.isArray(booking.payments) ? booking.payments : [];
+    const paid = Math.max(Number(booking.paidAmount) || 0,
+      history.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0));
+    const bill = calculateBookingBilling({ rows, travellerCount: newTravellerCount, paidAmount: paid });
 
     const updated = await db.booking.update({
       where: { id: bookingId },
       data: {
         travellers: updatedTravellers,
         travellerCount: newTravellerCount,
+        billingRows: bill.rows,
+        billingVersion: 1,
+        totalAmount: bill.totalAmount,
+        paidAmount: bill.paidAmount,
+        balanceAmount: bill.balanceAmount,
+        creditAmount: bill.creditAmount,
+        paymentStatus: bill.paymentStatus,
       },
     });
 
@@ -1119,7 +1148,7 @@ export async function addTravellerToBookingList(
       if (batch) {
         const allBookings = await db.booking.findMany({ where: { tripBatchId: booking.tripBatchId } });
         const totalBookedSeats = allBookings
-          .filter((b: any) => b.bookingStatus !== "Cancelled" && b.status !== "CANCELLED")
+          .filter((b: any) => String(b.bookingStatus || b.status || "").toUpperCase() !== "CANCELLED")
           .reduce((sum: number, b: any) => sum + (b.travellerCount || 1), 0);
 
         const availableSeats = Math.max(0, batch.totalSeats - totalBookedSeats);
