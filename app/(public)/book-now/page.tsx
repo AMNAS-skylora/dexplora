@@ -14,23 +14,34 @@ export default async function BookNowPage({ searchParams }: BookNowPageProps) {
 
   let packages: any[] = [];
   try {
-    packages = await db.package.findMany({
+    const packageRecords = await db.package.findMany({
       where: { status: "PUBLISHED" },
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        batches: {
-          where: { startDate: { gte: new Date() } },
-          select: {
-            id: true,
-            batchName: true,
-            startDate: true,
-            endDate: true,
-          },
-        },
-      },
+      include: { batches: true },
       orderBy: { displayOrder: "asc" },
+    });
+    const now = new Date();
+    now.setUTCHours(0, 0, 0, 0);
+    packages = (Array.isArray(packageRecords) ? packageRecords : []).map((pkg: any) => ({
+      id: pkg.id,
+      title: pkg.title,
+      slug: pkg.slug,
+      price: Number(pkg.price) || 0,
+      batches: (Array.isArray(pkg.batches) ? pkg.batches : [])
+        .filter((batch: any) =>
+          new Date(batch.startDate).getTime() >= now.getTime() &&
+          !["CANCELLED", "COMPLETED"].includes(String(batch.status))
+        )
+        .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+        .map((batch: any) => ({
+          id: batch.id,
+          batchName: batch.batchName,
+          startDate: batch.startDate,
+          endDate: batch.endDate,
+          priceOverride: batch.priceOverride ?? null,
+          totalSeats: batch.totalSeats,
+          availableSeats: batch.availableSeats,
+          status: batch.status,
+        })),
     });
   } catch (error) {
     console.error("Error fetching packages for booking form:", error);
