@@ -249,9 +249,11 @@ export function PackageDeparturesCalendar({
     const ratio = total > 0 ? avail / total : 0;
 
     let st = batch.status || "OPEN";
-    if (avail <= 0) st = "SOLD_OUT";
-    else if (ratio <= 0.25) st = "ALMOST_FULL";
-    else if (ratio <= 0.5) st = "FILLING_FAST";
+    if (!["CANCELLED", "COMPLETED", "SOLD_OUT"].includes(st)) {
+      if (avail <= 0) st = "SOLD_OUT";
+      else if (ratio <= 0.25) st = "ALMOST_FULL";
+      else if (ratio <= 0.5) st = "FILLING_FAST";
+    }
 
     switch (st) {
       case "FILLING_FAST":
