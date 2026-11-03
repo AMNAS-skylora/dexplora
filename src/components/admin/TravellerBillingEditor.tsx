@@ -60,7 +60,7 @@ export function TravellerBillingEditor({
     };
     setSaved(false);
     setRows((current) => current.map((row) => row.slot === slot ?
-      { ...row, extras: [...row.extras, extra] } : row));
+      { ...row, travelClass: "AC", extras: [...row.extras, extra] } : row));
   }
   function removeExtra(slot: number, id: string) {
     setSaved(false);
@@ -133,6 +133,17 @@ export function TravellerBillingEditor({
                     onChange={(event) => changeRow(row.slot, { benefit: event.target.value as TravellerBenefit })}
                     className="w-full min-h-11 rounded-xl border border-[#DCE5F4] bg-white px-3 py-2 text-sm">
                     {benefits.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-[#0B1026]">
+                  Ticket / Travel Class
+                  <select value={row.travelClass || "SLEEPER"}
+                    onChange={(event) => changeRow(row.slot, { travelClass: event.target.value as TravellerBillingRow["travelClass"] })}
+                    className="w-full min-h-11 rounded-xl border border-[#DCE5F4] bg-white px-3 py-2 text-sm">
+                    <option value="SLEEPER">Sleeper</option>
+                    <option value="AC">AC</option>
+                    <option value="SEATER">Seater</option>
+                    <option value="OTHER">Other</option>
                   </select>
                 </label>
                 <div className="text-xs rounded-xl border border-[#E8ECF3] bg-white px-3 py-3">
