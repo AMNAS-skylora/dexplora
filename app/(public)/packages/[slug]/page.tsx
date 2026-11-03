@@ -430,7 +430,7 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
               </div>
 
               <div className="space-y-3">
-                {itinerary.map((it: { id?: string; dayNumber: number; title: string; description: string; meals?: string | null; accommodation?: string | null }, idx: number) => (
+                {itinerary.map((it: { id?: string; dayNumber: number; title: string; description: string; imageUrl?: string | null; image?: string | null; meals?: string | null; accommodation?: string | null }, idx: number) => (
                   <div
                     key={it.id || `itin-${idx}`}
                     className="bg-white rounded-[16px] border border-[#E5EAF2] p-4.5 shadow-xs space-y-2.5"
@@ -453,6 +453,18 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
                     <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed sm:pl-11 break-words">
                       {it.description}
                     </p>
+
+                    {(it.imageUrl || it.image) && (
+                      <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-[#F3F7FF]">
+                        <Image
+                          src={it.imageUrl || it.image || ""}
+                          alt={it.title || "Itinerary day photo"}
+                          fill
+                          sizes="(max-width: 768px) 100vw, 800px"
+                          className="object-cover"
+                        />
+                      </div>
+                    )}
 
                     {(it.meals || it.accommodation) && (
                       <div className="sm:pl-11 flex flex-wrap items-center gap-2 text-xs font-semibold text-[#0B1026]">
