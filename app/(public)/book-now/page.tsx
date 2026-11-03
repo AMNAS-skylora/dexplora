@@ -42,7 +42,7 @@ export default async function BookNowPage({ searchParams }: BookNowPageProps) {
           availableSeats: batch.availableSeats,
           status: batch.status,
         })),
-    });
+    }));
   } catch (error) {
     console.error("Error fetching packages for booking form:", error);
   }
