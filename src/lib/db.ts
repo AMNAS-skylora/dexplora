@@ -327,15 +327,52 @@ async function populatePackageRelations(docs: any, include: any) {
     });
   }
 
+
+  // Read old standalone collections only when the package has no embedded data.
+  // A deliberate [] on the package is authoritative: do not resurrect deleted days.
+  const legacyFields = [
+    { field: "images", collection: "PackageImage" },
+    { field: "itineraries", collection: "PackageItinerary" },
+    { field: "inclusions", collection: "PackageInclusion" },
+    { field: "exclusions", collection: "PackageExclusion" },
+    { field: "faqs", collection: "PackageFAQ" },
+  ] as const;
+  for (const { field, collection } of legacyFields) {
+    if (!include?.[field]) continue;
+    const missing = items.filter((item: any) =>
+      item?.id && !Array.isArray(item[field]) &&
+      !Array.isArray(item[field]?.create) &&
+      !(field === "itineraries" && Array.isArray(item.itinerary)) &&
+      !(field === "images" && Array.isArray(item.gallery))
+    );
+    if (!missing.length) continue;
+    const idStrings = missing.map((item: any) => String(item.id));
+    const ids = [...idStrings, ...idStrings.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id))];
+    const records = await getDb().collection(collection).find({ packageId: { $in: ids } }).toArray();
+    const grouped = new Map<string, any[]>();
+    for (const record of records) {
+      const key = String(record.packageId || "");
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(transformDoc(record));
+    }
+    for (const item of missing) {
+      item[field] = grouped.get(String(item.id)) || [];
+    }
+  }
+
   // Guarantee all array fields on Package objects are arrays
   items.forEach((item: any) => {
     if (!item) return;
     if (!Array.isArray(item.batches)) item.batches = [];
-    if (!Array.isArray(item.images)) item.images = Array.isArray(item.gallery) ? item.gallery : [];
-    if (!Array.isArray(item.itineraries)) item.itineraries = Array.isArray(item.itinerary) ? item.itinerary : [];
-    if (!Array.isArray(item.inclusions)) item.inclusions = [];
-    if (!Array.isArray(item.exclusions)) item.exclusions = [];
-    if (!Array.isArray(item.faqs)) item.faqs = [];
+    if (!Array.isArray(item.images)) item.images = Array.isArray(item.images?.create) ? item.images.create : (Array.isArray(item.gallery) ? item.gallery : []);
+    if (!Array.isArray(item.itineraries)) item.itineraries = Array.isArray(item.itineraries?.create) ? item.itineraries.create : (Array.isArray(item.itinerary) ? item.itinerary : []);
+    if (!Array.isArray(item.inclusions)) item.inclusions = Array.isArray(item.inclusions?.create) ? item.inclusions.create : [];
+    if (!Array.isArray(item.exclusions)) item.exclusions = Array.isArray(item.exclusions?.create) ? item.exclusions.create : [];
+    if (!Array.isArray(item.faqs)) item.faqs = Array.isArray(item.faqs?.create) ? item.faqs.create : [];
+    item.itineraries.sort((a: any, b: any) => (Number(a.dayNumber) || 0) - (Number(b.dayNumber) || 0));
+    for (const field of ["images", "inclusions", "exclusions", "faqs"]) {
+      item[field].sort((a: any, b: any) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
+    }
   });
 
   return isArray ? items : items[0];
@@ -497,6 +534,18 @@ export function isDbAvailable(): boolean {
   return Boolean(uri && (uri.startsWith("mongodb://") || uri.startsWith("mongodb+srv://")));
 }
 
+function normalizePackageEmbeddedRelations(data: Record<string, any>) {
+  const fields = ["images", "itineraries", "inclusions", "exclusions", "faqs"];
+  for (const field of fields) {
+    if (!(field in data)) continue;
+    const value = data[field];
+    if (Array.isArray(value)) data[field] = value;
+    else if (value && Array.isArray(value.create)) data[field] = value.create;
+    else if (value && Array.isArray(value.set)) data[field] = value.set;
+  }
+  return data;
+}
+
 function createCollectionWrapper(collectionName: string) {
   const getCol = () => getDb().collection(collectionName);
 
@@ -583,6 +632,7 @@ function createCollectionWrapper(collectionName: string) {
 
     async create(args: any = {}) {
       const data = { ...args.data };
+      if (collectionName === "Package") normalizePackageEmbeddedRelations(data);
       if (!data.createdAt) data.createdAt = new Date();
       if (!data.updatedAt) data.updatedAt = new Date();
 
@@ -617,6 +667,7 @@ function createCollectionWrapper(collectionName: string) {
     async update(args: any = {}) {
       const filter = transformWhere(args.where);
       const updateData = { ...args.data };
+      if (collectionName === "Package") normalizePackageEmbeddedRelations(updateData);
       delete updateData.id;
       delete updateData._id;
       updateData.updatedAt = new Date();
