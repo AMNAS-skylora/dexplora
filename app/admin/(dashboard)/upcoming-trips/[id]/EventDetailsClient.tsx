@@ -439,6 +439,7 @@ export function EventDetailsClient({ batch, packages }: EventDetailsClientProps)
 
   const getPaymentBadgeClass = (status: string) => {
     switch (status.toUpperCase()) {
+      case "FREE":
       case "PAID":
         return "bg-emerald-100 text-emerald-800 border-emerald-200";
       case "PARTIALLY PAID":
