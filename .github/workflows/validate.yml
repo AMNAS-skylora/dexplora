@@ -22,6 +22,10 @@ jobs:
           node-version: "22"
           cache: npm
       - name: Install dependencies
-        run: npm ci --ignore-scripts
+        # Current lockfile has historical transitive version drift; npm install
+        # resolves dependencies until the lockfile is regenerated in a separate change.
+        run: npm install --ignore-scripts --no-audit --no-fund
       - name: Validate TypeScript
         run: npx tsc --noEmit
+      - name: Production build check
+        run: npm run build
