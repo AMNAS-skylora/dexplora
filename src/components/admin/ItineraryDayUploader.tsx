@@ -65,8 +65,9 @@ export function ItineraryDayUploader({
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      handleUploadFile(file);
+      void handleUploadFile(file);
     }
+    e.target.value = "";
   };
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -103,7 +104,7 @@ export function ItineraryDayUploader({
       </label>
 
       {value ? (
-        <div className="relative w-full aspect-[16/9] max-h-48 rounded-xl overflow-hidden bg-gray-900 border border-[#E8ECF3] group shadow-xs">
+        <div className="relative w-full max-w-[260px] aspect-[4/4.8] -rotate-[2deg] rounded-[3px] border-[7px] border-b-[22px] border-white bg-[#E8EFE4] shadow-[0_10px_24px_rgba(32,47,37,0.18)] group transition-transform hover:rotate-0">
           <Image
             src={value}
             alt={`Day ${dayNumber} Photo`}
@@ -111,7 +112,7 @@ export function ItineraryDayUploader({
             className="object-cover transition-transform duration-300 group-hover:scale-105"
             sizes="(max-width: 768px) 100vw, 500px"
           />
-          <div className="absolute inset-0 bg-black/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+          <div className="absolute inset-x-1 bottom-1 z-10 flex items-center justify-center gap-2 rounded-lg bg-black/55 p-1.5">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -128,7 +129,7 @@ export function ItineraryDayUploader({
               className="bg-red-600/90 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md flex items-center gap-1 transition-all min-h-[36px] cursor-pointer"
             >
               <X className="w-3 h-3" />
-              <span>Remove</span>
+              <span>Remove Photo</span>
             </button>
           </div>
         </div>
