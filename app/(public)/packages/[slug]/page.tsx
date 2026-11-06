@@ -5,6 +5,7 @@ import { MobileBookingBar } from "@/components/public/MobileBookingBar";
 import { PackageBookingButton } from "@/components/public/PackageBookingCTA";
 import { PackageCard } from "@/components/public/PackageCard";
 import { PackageDeparturesCalendar } from "@/components/public/PackageDeparturesCalendar";
+import { ItineraryTimeline } from "@/components/public/ItineraryTimeline";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -175,14 +176,6 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
     .filter((batch: any) => new Date(batch.startDate).getTime() >= Date.now() && batch.status !== "CANCELLED")
     .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0] ?? null;
   const itineraryDeparture = batches.find((batch: any) => batch.id === initialDepartureId) ?? nextBatch;
-  const itineraryDayDate = (dayNumber: number) => {
-    if (!itineraryDeparture?.startDate) return null;
-    const date = new Date(itineraryDeparture.startDate);
-    if (Number.isNaN(date.getTime())) return null;
-    date.setUTCDate(date.getUTCDate() + Math.max(0, dayNumber - 1));
-    return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
-  };
-
   // Safe WhatsApp & Phone handling
   const cleanWhatsapp = (settings?.whatsapp_number ?? "").replace(/\D/g, "");
   const whatsappUrl = cleanWhatsapp
@@ -417,73 +410,12 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
             </div>
           )}
 
-          {/* Day-by-Day Detailed Itinerary */}
+          {/* Polaroid photo timeline — all saved package days, no duplicate old cards. */}
           {itinerary.length > 0 && (
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center justify-between">
-                <h2 className="text-[clamp(20px,5vw,27px)] font-bold text-[#0B1026] leading-tight">
-                  Detailed Itinerary
-                </h2>
-                <span className="text-xs text-[#3478F6] font-bold bg-[#3478F6]/10 px-2.5 py-1 rounded-full">
-                  {itinerary.length} Days Schedule
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {itinerary.map((it: { id?: string; dayNumber: number; title: string; description: string; imageUrl?: string | null; image?: string | null; meals?: string | null; accommodation?: string | null }, idx: number) => (
-                  <div
-                    key={it.id || `itin-${idx}`}
-                    className="bg-white rounded-[16px] border border-[#E5EAF2] p-4.5 shadow-xs space-y-2.5"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 rounded-xl bg-[#3478F6] text-white font-extrabold text-xs flex items-center justify-center shrink-0">
-                        Day {it.dayNumber}
-                      </span>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
-                        <h3 className="font-bold text-sm sm:text-base text-[#0B1026]">{it.title}</h3>
-                        {itineraryDayDate(it.dayNumber) && (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-[#64748B]">
-                            <CalendarDays className="w-3.5 h-3.5" />
-                            {itineraryDayDate(it.dayNumber)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed sm:pl-11 break-words">
-                      {it.description}
-                    </p>
-
-                    {(it.imageUrl || it.image) && (
-                      <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-[#F3F7FF]">
-                        <Image
-                          src={it.imageUrl || it.image || ""}
-                          alt={it.title || "Itinerary day photo"}
-                          fill
-                          sizes="(max-width: 768px) 100vw, 800px"
-                          className="object-cover"
-                        />
-                      </div>
-                    )}
-
-                    {(it.meals || it.accommodation) && (
-                      <div className="sm:pl-11 flex flex-wrap items-center gap-2 text-xs font-semibold text-[#0B1026]">
-                        {it.meals && (
-                          <span className="bg-[#F3F7FF] text-[#3478F6] px-2.5 py-1 rounded-md">
-                            Meals: {it.meals}
-                          </span>
-                        )}
-                        {it.accommodation && (
-                          <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-md">
-                            Stay: {it.accommodation}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ItineraryTimeline
+              days={itinerary}
+              departureDate={itineraryDeparture?.startDate ?? null}
+            />
           )}
 
           {/* Inclusions & Exclusions */}
