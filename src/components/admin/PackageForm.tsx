@@ -145,7 +145,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
 
   // Dynamic Itinerary state with day images
   const [itineraries, setItineraries] = useState<Array<{ dayNumber: number; title: string; description: string; imageUrl?: string }>>(
-    initialData?.itineraries?.length
+    Array.isArray(initialData?.itineraries)
       ? initialData.itineraries.map((it, idx) => ({
           dayNumber: idx + 1,
           title: it.title || "",
