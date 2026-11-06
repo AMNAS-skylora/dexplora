@@ -57,7 +57,7 @@ function photoUrl(value: string | null | undefined): string | null {
   return (url.startsWith("/") && !url.startsWith("//")) || /^https:\/\//i.test(url) ? url : null;
 }
 
-/** Photo-first vertical itinerary. The original warm ivory / mint palette stays unchanged. */
+/** Photo-first vertical itinerary, in a soft sky-blue / navy palette. */
 export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProps) {
   const ordered = (Array.isArray(days) ? days : [])
     .filter((day) => Number.isFinite(Number(day.dayNumber)))
@@ -68,21 +68,21 @@ export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProp
   return (
     <section
       aria-label="Day-by-day detailed itinerary"
-      className="w-full min-w-0 overflow-hidden rounded-[24px] bg-[#FFF7EF] px-3.5 py-6 text-[#292723] sm:px-6 sm:py-8 lg:px-9"
+      className="w-full min-w-0 overflow-hidden rounded-[24px] bg-[#F2F7FF] px-3.5 py-6 text-[#192B4A] sm:px-6 sm:py-8 lg:px-9"
     >
       <header className="mb-6 sm:mb-9">
-        <p className="mb-1.5 text-[10px] font-extrabold tracking-[0.2em] text-[#56826A]">
+        <p className="mb-1.5 text-[10px] font-extrabold tracking-[0.2em] text-[#3769B3]">
           YOUR JOURNEY
         </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[clamp(23px,5vw,34px)] font-extrabold leading-tight tracking-[-0.03em]">
             Day-by-Day Itinerary
           </h2>
-          <span className="rounded-full bg-[#D4F3DF] px-3 py-1.5 text-xs font-bold text-[#235D3E]">
+          <span className="rounded-full bg-[#D7E9FF] px-3 py-1.5 text-xs font-bold text-[#174B8C]">
             {ordered.length} {ordered.length === 1 ? "Day" : "Days"}
           </span>
         </div>
-        <p className="mt-2 text-xs leading-relaxed text-[#645F58] sm:text-sm">
+        <p className="mt-2 text-xs leading-relaxed text-[#62748D] sm:text-sm">
           Explore every memorable stop of your journey.
         </p>
       </header>
@@ -99,8 +99,8 @@ export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProp
               className="grid min-w-0 grid-cols-[minmax(79px,25%)_minmax(0,1fr)] items-start gap-2.5 sm:grid-cols-[minmax(128px,27%)_minmax(0,1fr)] sm:gap-7"
             >
               <div className="min-w-0 pt-2 sm:pt-1">
-                <div className={"relative mx-auto w-[94%] max-w-[210px] bg-white p-[5px] pb-4 shadow-[0_12px_25px_rgba(80,64,45,0.18)] transition-transform hover:rotate-0 sm:p-[9px] sm:pb-7 " + (index % 2 ? "rotate-[4deg]" : "-rotate-[4deg]")}>
-                  <div className="relative aspect-[4/4.4] w-full overflow-hidden bg-[#E8EFE4]">
+                <div className={"relative mx-auto w-[94%] max-w-[210px] bg-white p-[5px] pb-4 shadow-[0_12px_25px_rgba(28,72,137,0.17)] transition-transform hover:rotate-0 sm:p-[9px] sm:pb-7 " + (index % 2 ? "rotate-[4deg]" : "-rotate-[4deg]")}>
+                  <div className="relative aspect-[4/4.4] w-full overflow-hidden bg-[#E4EEFB]">
                     {photo ? (
                       <Image
                         src={photo}
@@ -111,7 +111,7 @@ export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProp
                         alt={"Photo for Day " + dayNum + ": " + (day.title || "Travel itinerary")}
                       />
                     ) : (
-                      <div className="flex h-full flex-col items-center justify-center gap-2 px-1 text-center text-[#649177]">
+                      <div className="flex h-full flex-col items-center justify-center gap-2 px-1 text-center text-[#4275B8]">
                         <span className="text-2xl" aria-hidden="true">✦</span>
                         <span className="text-[9px] font-bold uppercase tracking-wide sm:text-xs">Day {dayNum}</span>
                       </div>
@@ -120,18 +120,18 @@ export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProp
                 </div>
               </div>
 
-              <div className="relative min-w-0 border-l-2 border-[#CAC5BD] pb-5 pl-4 sm:pl-8">
+              <div className="relative min-w-0 border-l-2 border-[#AEC6E8] pb-5 pl-4 sm:pl-8">
                 <span aria-hidden="true"
-                  className="absolute -left-[10px] top-1 h-[18px] w-[18px] rounded-full border-[3px] border-[#FFF7EF] bg-[#A5EEC4] sm:-left-[13px] sm:h-6 sm:w-6"
+                  className="absolute -left-[10px] top-1 h-[18px] w-[18px] rounded-full border-[3px] border-[#F2F7FF] bg-[#83BAFF] sm:-left-[13px] sm:h-6 sm:w-6"
                 />
                 <header className="mb-3 space-y-2 sm:mb-5 sm:space-y-3">
-                  <div className="inline-flex min-h-8 items-center rounded-full bg-[#CCF0D8] px-3 py-1 text-sm font-extrabold text-[#18472C] sm:px-5 sm:py-1.5 sm:text-lg">
+                  <div className="inline-flex min-h-8 items-center rounded-full bg-[#D7E9FF] px-3 py-1 text-sm font-extrabold text-[#163E78] sm:px-5 sm:py-1.5 sm:text-lg">
                     Day {dayNum}
                   </div>
-                  <h3 className="break-words text-[15px] font-extrabold leading-snug tracking-[-0.015em] text-[#292723] sm:text-xl">
+                  <h3 className="break-words text-[15px] font-extrabold leading-snug tracking-[-0.015em] text-[#192B4A] sm:text-xl">
                     {day.title || "Day " + dayNum}
                   </h3>
-                  {date && <time className="block text-[11px] font-semibold text-[#6A655E] sm:text-xs">{date}</time>}
+                  {date && <time className="block text-[11px] font-semibold text-[#657A99] sm:text-xs">{date}</time>}
                 </header>
 
                 {activities.length ? (
@@ -140,23 +140,23 @@ export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProp
                       <li key={dayNum + "-activity-" + entryIndex}
                         className="grid min-w-0 grid-cols-[minmax(0,61px)_minmax(0,1fr)] gap-2 sm:grid-cols-[minmax(0,91px)_minmax(0,1fr)] sm:gap-4"
                       >
-                        <span className="break-words border-r border-[#D8CEC3] pr-2 text-[10px] font-bold leading-relaxed text-[#37332D] sm:pr-3 sm:text-sm">
+                        <span className="break-words border-r border-[#C8D7EB] pr-2 text-[10px] font-bold leading-relaxed text-[#244876] sm:pr-3 sm:text-sm">
                           {entry.time || ""}
                         </span>
-                        <span className="min-w-0 break-words text-[11px] leading-relaxed text-[#514A43] sm:text-sm">
+                        <span className="min-w-0 break-words text-[11px] leading-relaxed text-[#455B77] sm:text-sm">
                           {entry.activity}
                         </span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-xs text-[#776F67]">Activities will be updated soon.</p>
+                  <p className="text-xs text-[#6B7F98]">Activities will be updated soon.</p>
                 )}
 
                 {(day.meals || day.accommodation) && (
-                  <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-semibold text-[#3A654B] sm:text-xs">
-                    {day.meals && <span className="rounded-lg bg-[#E1F5E9] px-2.5 py-1.5">Meals: {day.meals}</span>}
-                    {day.accommodation && <span className="rounded-lg bg-[#E1F5E9] px-2.5 py-1.5">Stay: {day.accommodation}</span>}
+                  <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-semibold text-[#22558D] sm:text-xs">
+                    {day.meals && <span className="rounded-lg bg-[#E0EDFF] px-2.5 py-1.5">Meals: {day.meals}</span>}
+                    {day.accommodation && <span className="rounded-lg bg-[#E0EDFF] px-2.5 py-1.5">Stay: {day.accommodation}</span>}
                   </div>
                 )}
               </div>
