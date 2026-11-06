@@ -292,6 +292,11 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
   };
 
   const removeItineraryDay = (index: number) => {
+    const day = itineraries[index];
+    if (!day || loading) return;
+    if (!window.confirm("Remove Day " + day.dayNumber + " and its attached photo from this itinerary? Click Save Package to persist this change.")) {
+      return;
+    }
     setItineraries((prev) =>
       prev
         .filter((_, i) => i !== index)
@@ -696,7 +701,8 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <h3 className="font-extrabold text-base text-[#0B1026]">3. Day-by-Day Itinerary</h3>
-            <p className="text-xs text-gray-500">Each day is saved with this package. Dates are calculated from the selected departure, not fixed to the package.</p>
+            <p className="text-xs text-gray-500">Edit, add or remove any day and its photo. Dates follow the departure, not the package.</p>
+            <p className="text-[11px] font-semibold text-amber-700">Click Save Package after deleting days or removing photos. Deletions won't affect an existing booking.</p>
           </div>
           <button
             type="button"
@@ -709,22 +715,27 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
         </div>
 
         <div className="space-y-5">
+          {itineraries.length === 0 && (
+            <div role="status" className="rounded-2xl border border-dashed border-[#D7E0EC] bg-[#F8FAFC] p-6 text-center text-sm text-[#64748B]">
+              No itinerary days. Use Add Day to create a new day, or Save Package to remove the itinerary.
+            </div>
+          )}
           {itineraries.map((it, idx) => (
             <div key={idx} className="bg-[#F8FAFC] p-4 sm:p-5 rounded-2xl border border-[#E8ECF3] space-y-4">
               <div className="flex items-center justify-between">
                 <span className="font-extrabold text-xs text-[#3478F6] uppercase tracking-wider bg-[#3478F6]/10 px-2.5 py-1 rounded-lg">
                   Day {it.dayNumber}
                 </span>
-                {itineraries.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeItineraryDay(idx)}
-                    className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Remove Day</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => removeItineraryDay(idx)}
+                  disabled={loading}
+                  aria-label={"Delete itinerary Day " + it.dayNumber}
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500 disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Day</span>
+                </button>
               </div>
 
               <div className="space-y-3">
@@ -754,7 +765,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
                   />
                 </div>
 
-                {/* Day Image Uploader */}
+                {/* Day photo can be replaced or removed independently of the day. */}
                 <ItineraryDayUploader
                   dayNumber={it.dayNumber}
                   value={it.imageUrl}
