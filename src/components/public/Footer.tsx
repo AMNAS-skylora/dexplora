@@ -93,6 +93,11 @@ export function Footer({ settings }: FooterProps) {
                   Traveler Reviews
                 </Link>
               </li>
+              <li>
+                <Link href="/cancellation-policy" className="font-semibold text-[#BED9FF] hover:text-white transition-colors">
+                  Cancellation &amp; Refund Policy
+                </Link>
+              </li>
             </ul>
           </div>
 
