@@ -37,18 +37,18 @@ export function CancellationPolicySection({
           <p className="mb-4 text-[13px] leading-relaxed text-[#D3D3D3] sm:text-sm">
             {policy.cancellationNotes}
           </p>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[280px] border-collapse text-left">
+          <div className="min-w-0 w-full">
+            <table className="w-full table-fixed border-collapse text-left">
               <thead>
                 <tr className="border-b border-white/20">
-                  <th scope="col" className="w-[68%] px-1 py-3 text-[13px] font-extrabold text-white sm:text-[15px]">Cancellation period</th>
-                  <th scope="col" className="px-1 py-3 text-right text-[13px] font-extrabold text-white sm:text-[15px]">Cancellation charge</th>
+                  <th scope="col" className="w-[63%] break-words px-1 py-3 pr-3 text-[12px] font-extrabold leading-snug text-white sm:text-[15px]">Cancellation period</th>
+                  <th scope="col" className="w-[37%] break-words px-1 py-3 text-right text-[12px] font-extrabold leading-snug text-white sm:text-[15px]"><span className="sm:hidden">Charge</span><span className="hidden sm:inline">Cancellation charge</span></th>
                 </tr>
               </thead>
               <tbody>
                 {policy.charges.map((rule, index) => (
                   <tr key={rule.period + "-" + index} className="border-b border-white/15 last:border-b-0">
-                    <td className="px-1 py-4 pr-4 text-[13px] font-medium leading-relaxed text-[#F3F3F3] sm:text-base">{rule.period}</td>
+                    <td className="break-words px-1 py-4 pr-3 text-[13px] font-medium leading-relaxed text-[#F3F3F3] sm:text-base">{rule.period}</td>
                     <td className="px-1 py-4 text-right text-[15px] font-extrabold tabular-nums text-white sm:text-lg">{rule.percentage}%</td>
                   </tr>
                 ))}
