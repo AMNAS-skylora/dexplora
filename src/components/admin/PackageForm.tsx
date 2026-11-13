@@ -35,6 +35,10 @@ export interface PackageInitialData {
   displayOrder?: number;
   seoTitle?: string | null;
   seoDescription?: string | null;
+  bookingAdvancePercentOverride?: number | null;
+  cancellationChargesOverride?: string | null;
+  cancellationNotesOverride?: string | null;
+  importantNoticeOverride?: string | null;
   images?: Array<{ url: string; caption?: string | null }>;
   itineraries?: Array<{ dayNumber: number; title: string; description: string; imageUrl?: string | null; meals?: string | null; accommodation?: string | null }>;
   inclusions?: Array<{ text: string }>;
@@ -249,6 +253,11 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       displayOrder: Number(formData.get("displayOrder")) || 0,
       seoTitle: (formData.get("seoTitle") as string) || undefined,
       seoDescription: (formData.get("seoDescription") as string) || undefined,
+      bookingAdvancePercentOverride: String(formData.get("bookingAdvancePercentOverride") || "").trim() === ""
+        ? null : Number(formData.get("bookingAdvancePercentOverride")),
+      cancellationChargesOverride: (formData.get("cancellationChargesOverride") as string)?.trim() || null,
+      cancellationNotesOverride: (formData.get("cancellationNotesOverride") as string)?.trim() || null,
+      importantNoticeOverride: (formData.get("importantNoticeOverride") as string)?.trim() || null,
       images: galleryImages.filter((img) => img.url.trim() !== ""),
       // Save every row, including an added day that has not been filled in yet.
       // The server normalizes titles and persists the complete array.
@@ -778,6 +787,46 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
           ))}
         </div>
       </div>
+
+      {/* Per-package cancellation, refund and important notice overrides */}
+      <section className="rounded-3xl border border-[#D8E5F6] bg-white p-5 shadow-sm space-y-4 sm:p-6">
+        <div>
+          <h3 className="text-base font-extrabold text-[#0B1026]">Cancellation & Refund Policy — Package Settings</h3>
+          <p className="mt-1 text-xs leading-relaxed text-[#64748B]">
+            These optional fields override the global policy for this package only.
+            Leave any field blank to use the defaults from Website Settings.
+          </p>
+        </div>
+        <label className="block space-y-1">
+          <span className="text-xs font-bold text-[#0B1026]">Package Booking Advance (%) — Optional</span>
+          <input type="number" name="bookingAdvancePercentOverride" min="0" max="100" step="0.01"
+            defaultValue={initialData?.bookingAdvancePercentOverride ?? ""}
+            placeholder="Use global advance (30% by default)"
+            className="min-h-11 w-full rounded-xl border border-[#E8ECF3] bg-[#F3F7FF] px-3.5 py-2.5 text-sm font-bold text-[#0B1026]" />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-xs font-bold text-[#0B1026]">Custom Cancellation Charges — Optional</span>
+          <textarea name="cancellationChargesOverride" rows={6}
+            defaultValue={initialData?.cancellationChargesOverride || ""}
+            placeholder={"30 days or more before departure|10\n15–29 days before departure|25\n7–14 days before departure|50"}
+            className="w-full rounded-xl border border-[#E8ECF3] bg-[#F3F7FF] px-3.5 py-3 font-mono text-xs leading-relaxed text-[#0B1026] sm:text-sm" />
+          <span className="block text-xs text-[#64748B]">One row per period, formatted Period|Percentage. Blank = global charges.</span>
+        </label>
+        <label className="block space-y-1">
+          <span className="text-xs font-bold text-[#0B1026]">Package Cancellation Notes — Optional</span>
+          <textarea name="cancellationNotesOverride" rows={3} maxLength={2000}
+            defaultValue={initialData?.cancellationNotesOverride || ""}
+            placeholder="Use global cancellation notes"
+            className="w-full rounded-xl border border-[#E8ECF3] bg-[#F3F7FF] px-3.5 py-3 text-sm leading-relaxed text-[#0B1026]" />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-xs font-bold text-[#0B1026]">Package Important Notice — Optional</span>
+          <textarea name="importantNoticeOverride" rows={4} maxLength={3000}
+            defaultValue={initialData?.importantNoticeOverride || ""}
+            placeholder="Use global important notice"
+            className="w-full rounded-xl border border-[#E8ECF3] bg-[#F3F7FF] px-3.5 py-3 text-sm leading-relaxed text-[#0B1026]" />
+        </label>
+      </section>
 
       {/* Dynamic Inclusions & Exclusions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
