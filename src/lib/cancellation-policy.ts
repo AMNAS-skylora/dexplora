@@ -1,11 +1,27 @@
 /** Dexplora cancellation and refund policy. Stored as plain text and rendered safely. */
 export const DEFAULT_CANCELLATION_CHARGES = [
+  "30 days or more before departure|30",
+  "15–29 days before departure|50",
+  "7–14 days before departure|75",
+  "Within 7 days of departure|100",
+  "No-show / Failure to join|100",
+].join("\n");
+
+/** Previously shipped site defaults. Only migrate an exact old default; keep custom rules. */
+export const LEGACY_DEFAULT_CANCELLATION_CHARGES = [
   "30 days or more before departure|10",
   "15–29 days before departure|25",
   "7–14 days before departure|50",
   "Within 7 days of departure|100",
   "No-show / Failure to join|100",
 ].join("\n");
+
+export function normalizeLegacyCancellationCharges(value?: string | null): string {
+  const raw = (value ?? "").replace(/\r/g, "").trim();
+  return raw === LEGACY_DEFAULT_CANCELLATION_CHARGES
+    ? DEFAULT_CANCELLATION_CHARGES
+    : raw;
+}
 
 export const DEFAULT_CANCELLATION_NOTES =
   "Cancellation charges are calculated based on the total package cost per person.";
@@ -83,7 +99,9 @@ export function resolveCancellationPolicy(
   let charges;
   try {
     charges = parseCancellationCharges(
-      pkg.cancellationChargesOverride?.trim() || settings.cancellation_charges || DEFAULT_CANCELLATION_CHARGES,
+      normalizeLegacyCancellationCharges(pkg.cancellationChargesOverride) ||
+      normalizeLegacyCancellationCharges(settings.cancellation_charges) ||
+      DEFAULT_CANCELLATION_CHARGES,
     );
   } catch {
     charges = parseCancellationCharges(DEFAULT_CANCELLATION_CHARGES);
