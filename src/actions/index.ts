@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb";
 import { normalizeDepartureInput } from "@/lib/departure-rules";
 import { notifyBookingEvent } from "@/lib/email/booking-notifications";
 import { buildPackageEmbeddedRelations } from "@/lib/package-relations";
+import { parseCancellationCharges, validateCancellationSettings } from "@/lib/cancellation-policy";
 import { calculateBookingBilling, createInitialBillingRows, getBookingBillingRows, type TravellerBenefit, type TravellerExtraCharge } from "@/lib/traveller-billing";
 import { setAdminSessionCookie, clearAdminSessionCookie, getAdminSession } from "@/lib/auth";
 import { generateBookingRef, slugify } from "@/lib/utils";
@@ -276,6 +277,10 @@ export interface PackageInputData {
   displayOrder?: number;
   seoTitle?: string;
   seoDescription?: string;
+  bookingAdvancePercentOverride?: number | null;
+  cancellationChargesOverride?: string | null;
+  cancellationNotesOverride?: string | null;
+  importantNoticeOverride?: string | null;
   images?: Array<{ url: string; caption?: string }>;
   itineraries?: Array<{ dayNumber?: number; title: string; description: string; image?: string | null; imageUrl?: string | null; meals?: string | null; accommodation?: string | null }>;
   inclusions?: Array<string | { text: string }>;
@@ -387,6 +392,19 @@ export async function createPackage(data: PackageInputData) {
   if (!session) return { error: "Unauthorized" };
 
   try {
+    if (data.bookingAdvancePercentOverride != null) {
+      const percent = Number(data.bookingAdvancePercentOverride);
+      if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+        return { error: "Package booking advance must be between 0 and 100%." };
+      }
+    }
+    if (data.cancellationChargesOverride?.trim()) {
+      parseCancellationCharges(data.cancellationChargesOverride);
+    }
+    if ((data.cancellationNotesOverride?.length ?? 0) > 2000
+      || (data.importantNoticeOverride?.length ?? 0) > 3000) {
+      return { error: "Package cancellation notes or notice is too long." };
+    }
     const rawTitle = data.title?.trim() || "";
     if (!rawTitle) {
       return { error: "Package title is required." };
@@ -432,6 +450,10 @@ export async function createPackage(data: PackageInputData) {
         displayOrder: Number(data.displayOrder) || 0,
         seoTitle: data.seoTitle || data.title,
         seoDescription: data.seoDescription || data.shortDescription,
+        bookingAdvancePercentOverride: data.bookingAdvancePercentOverride ?? null,
+        cancellationChargesOverride: data.cancellationChargesOverride?.trim() || null,
+        cancellationNotesOverride: data.cancellationNotesOverride?.trim() || null,
+        importantNoticeOverride: data.importantNoticeOverride?.trim() || null,
         ...buildPackageEmbeddedRelations(data),
       },
     });
@@ -442,6 +464,7 @@ export async function createPackage(data: PackageInputData) {
 
     revalidatePath("/");
     revalidatePath("/packages");
+    revalidatePath("/cancellation-policy");
     revalidatePath("/admin/packages");
     return { success: true, package: newPkg };
   } catch (error: any) {
@@ -455,6 +478,19 @@ export async function updatePackage(id: string, data: PackageInputData) {
   if (!session) return { error: "Unauthorized" };
 
   try {
+    if (data.bookingAdvancePercentOverride != null) {
+      const percent = Number(data.bookingAdvancePercentOverride);
+      if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+        return { error: "Package booking advance must be between 0 and 100%." };
+      }
+    }
+    if (data.cancellationChargesOverride?.trim()) {
+      parseCancellationCharges(data.cancellationChargesOverride);
+    }
+    if ((data.cancellationNotesOverride?.length ?? 0) > 2000
+      || (data.importantNoticeOverride?.length ?? 0) > 3000) {
+      return { error: "Package cancellation notes or notice is too long." };
+    }
     const existingPkg = await db.package.findUnique({ where: { id } });
     if (!existingPkg) return { error: "Package not found." };
 
@@ -496,6 +532,10 @@ export async function updatePackage(id: string, data: PackageInputData) {
         displayOrder: Number(data.displayOrder) || 0,
         seoTitle: data.seoTitle || data.title,
         seoDescription: data.seoDescription || data.shortDescription,
+        bookingAdvancePercentOverride: data.bookingAdvancePercentOverride ?? null,
+        cancellationChargesOverride: data.cancellationChargesOverride?.trim() || null,
+        cancellationNotesOverride: data.cancellationNotesOverride?.trim() || null,
+        importantNoticeOverride: data.importantNoticeOverride?.trim() || null,
         ...buildPackageEmbeddedRelations(data),
       },
     });
@@ -506,6 +546,7 @@ export async function updatePackage(id: string, data: PackageInputData) {
 
     revalidatePath("/");
     revalidatePath("/packages");
+    revalidatePath("/cancellation-policy");
     revalidatePath(`/packages/${packageSlug}`);
     revalidatePath("/admin/packages");
     return { success: true, package: updatedPkg };
@@ -1271,18 +1312,26 @@ export async function deleteHeroSlide(id: string) {
 export async function updateSiteSettings(settings: Record<string, string>) {
   const session = await getAdminSession();
   if (!session) return { error: "Unauthorized" };
+  if (!["ADMIN", "SUPER_ADMIN"].includes(session.role)) return { error: "Admin access required." };
 
-  for (const [key, value] of Object.entries(settings)) {
-    await db.siteSetting.upsert({
-      where: { key },
-      update: { value },
-      create: { key, value, group: "general" },
-    });
+  try {
+    validateCancellationSettings(settings);
+    for (const [key, value] of Object.entries(settings)) {
+      if (typeof value !== "string") return { error: "Invalid settings value." };
+      await db.siteSetting.upsert({
+        where: { key },
+        update: { value },
+        create: { key, value, group: "general" },
+      });
+    }
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/settings");
+    revalidatePath("/cancellation-policy");
+    revalidatePath("/packages");
+    return { success: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Unable to save site settings." };
   }
-
-  revalidatePath("/", "layout");
-  revalidatePath("/admin/settings");
-  return { success: true };
 }
 
 // ================= GALLERY ACTIONS =================
