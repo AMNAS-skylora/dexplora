@@ -5,6 +5,8 @@ import { MobileBookingBar } from "@/components/public/MobileBookingBar";
 import { PackageBookingButton } from "@/components/public/PackageBookingCTA";
 import { PackageCard } from "@/components/public/PackageCard";
 import { PackageDeparturesCalendar } from "@/components/public/PackageDeparturesCalendar";
+import { CancellationPolicySection } from "@/components/public/CancellationPolicySection";
+import { resolveCancellationPolicy } from "@/lib/cancellation-policy";
 import { ItineraryTimeline } from "@/components/public/ItineraryTimeline";
 import { notFound } from "next/navigation";
 import Image from "next/image";
@@ -426,13 +428,13 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
                 <div className="bg-[#F0FDF4] rounded-[16px] p-4.5 border border-[#DCFCE7] space-y-3">
                   <div className="flex items-center gap-2 text-[#16A36A]">
                     <CheckCircle2 className="w-4.5 h-4.5 shrink-0 stroke-[2.5]" />
-                    <h3 className="font-bold text-sm sm:text-base">What&apos;s Included</h3>
+                    <h3 className="font-extrabold text-base sm:text-lg">What&apos;s Included</h3>
                   </div>
-                  <ul className="space-y-2 text-xs text-[#1E293B] font-medium">
+                  <ul className="space-y-2.5 text-[14px] leading-relaxed text-[#1E293B] font-semibold sm:text-[15px]">
                     {inclusions.map((inc: { id?: string; text: string }, idx: number) => (
                       <li key={inc.id || `inc-${idx}`} className="flex items-start gap-2">
                         <span className="text-[#16A36A] font-bold">✓</span>
-                        <span className="break-words">{inc.text}</span>
+                        <span className="break-words font-bold">{inc.text}</span>
                       </li>
                     ))}
                   </ul>
@@ -458,6 +460,9 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
               )}
             </div>
           )}
+
+          {/* Global policy inherited by default; package-specific overrides take priority. */}
+          <CancellationPolicySection policy={resolveCancellationPolicy(settings, pkg)} />
 
           {/* Boarding Points */}
           {pkg.departureLocation && (
