@@ -41,13 +41,13 @@ export function parseCancellationCharges(value: string): CancellationPolicy["cha
   if (!lines.length || lines.length > 20) throw new Error("Enter between 1 and 20 cancellation periods.");
   return lines.map((line, index) => {
     const delimiter = line.lastIndexOf("|");
-    if (delimiter < 1) throw new Error(\`Row \${index + 1} must use Period|Percentage.\`);
+    if (delimiter < 1) throw new Error(`Row ${index + 1} must use Period|Percentage.`);
     const period = line.slice(0, delimiter).trim();
     const percentString = line.slice(delimiter + 1).trim().replace(/%$/, "");
     const percentage = Number(percentString);
     if (!period || period.length > 180 || !percentString || !Number.isFinite(percentage)
       || percentage < 0 || percentage > 100) {
-      throw new Error(\`Row \${index + 1} has an invalid period or charge (0–100%).\`);
+      throw new Error(`Row ${index + 1} has an invalid period or charge (0–100%).`);
     }
     return { period, percentage };
   });
