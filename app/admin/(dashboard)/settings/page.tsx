@@ -1,11 +1,15 @@
 import { getSiteSettings } from "@/lib/settings";
 import { updateSiteSettings } from "@/actions";
 import { Save, Settings } from "lucide-react";
+import { redirect } from "next/navigation";
 
 export const revalidate = 0;
 
-export default async function AdminSettingsPage() {
+export default async function AdminSettingsPage({
+  searchParams,
+}: { searchParams?: Promise<{ saved?: string; error?: string }> }) {
   const settings = await getSiteSettings();
+  const feedback = searchParams ? await searchParams : {};
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-12">
@@ -15,6 +19,17 @@ export default async function AdminSettingsPage() {
           Manage company contact numbers, WhatsApp integration, social media profiles, and SEO defaults.
         </p>
       </div>
+
+      {feedback.saved === "1" && (
+        <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+          Website settings, cancellation policy and notices saved successfully.
+        </p>
+      )}
+      {feedback.error && (
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+          {feedback.error}
+        </p>
+      )}
 
       <form action={async (formData: FormData) => {
         "use server";
@@ -37,7 +52,9 @@ export default async function AdminSettingsPage() {
           cancellation_notes: String(formData.get("cancellation_notes") ?? ""),
           important_notice: String(formData.get("important_notice") ?? ""),
         };
-        await updateSiteSettings(newSettings);
+        const result = await updateSiteSettings(newSettings);
+        if (result.error) redirect("/admin/settings?error=" + encodeURIComponent(result.error.slice(0, 220)));
+        redirect("/admin/settings?saved=1");
       }} className="space-y-6">
 
         {/* 1. Contact Information */}
