@@ -282,7 +282,7 @@ export interface PackageInputData {
   cancellationNotesOverride?: string | null;
   importantNoticeOverride?: string | null;
   images?: Array<{ url: string; caption?: string }>;
-  itineraries?: Array<{ dayNumber?: number; title: string; description: string; image?: string | null; imageUrl?: string | null; meals?: string | null; accommodation?: string | null }>;
+  itineraries?: Array<{ dayNumber?: number; title: string; description: string; image?: string | null; imageUrl?: string | null; meals?: string | null; accommodation?: string | null; stopName?: string | null; transportMode?: string | null; transportNote?: string | null }>;
   inclusions?: Array<string | { text: string }>;
   exclusions?: Array<string | { text: string }>;
   faqs?: Array<{ question: string; answer: string }>;
