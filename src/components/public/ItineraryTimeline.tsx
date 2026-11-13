@@ -135,22 +135,34 @@ export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProp
                 </header>
 
                 {activities.length ? (
-                  <ul className="space-y-2.5 sm:space-y-3">
+                  <ul className="space-y-3 sm:space-y-4" aria-label={`Day ${dayNum} activities`}>
                     {activities.map((entry, entryIndex) => (
-                      <li key={dayNum + "-activity-" + entryIndex}
-                        className="grid min-w-0 grid-cols-[minmax(0,61px)_minmax(0,1fr)] gap-2 sm:grid-cols-[minmax(0,91px)_minmax(0,1fr)] sm:gap-4"
+                      <li
+                        key={dayNum + "-activity-" + entryIndex}
+                        className={entry.time
+                          ? "grid min-w-0 grid-cols-[minmax(0,61px)_minmax(0,1fr)] items-start gap-2 sm:grid-cols-[minmax(0,95px)_minmax(0,1fr)] sm:gap-4"
+                          : "min-w-0"
+                        }
                       >
-                        <span className="break-words border-r border-[#C8D7EB] pr-2 text-[10px] font-bold leading-relaxed text-[#244876] sm:pr-3 sm:text-sm">
-                          {entry.time || ""}
-                        </span>
-                        <span className="min-w-0 break-words text-[11px] leading-relaxed text-[#455B77] sm:text-sm">
-                          {entry.activity}
+                        {entry.time && (
+                          <span className="break-words border-r border-[#C8D7EB] pr-2 text-[12px] font-bold leading-[1.6] text-[#244876] sm:pr-3 sm:text-[14px]">
+                            {entry.time}
+                          </span>
+                        )}
+                        <span className="flex min-w-0 items-start gap-2 sm:gap-2.5">
+                          <span
+                            aria-hidden="true"
+                            className="mt-[8px] h-[7px] w-[7px] shrink-0 rounded-full bg-[#3679D1] sm:mt-[9px] sm:h-2 sm:w-2"
+                          />
+                          <span className="min-w-0 break-words text-[14px] font-semibold leading-[1.6] text-[#253D5D] sm:text-[16px] sm:font-bold">
+                            {entry.activity}
+                          </span>
                         </span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-xs text-[#6B7F98]">Activities will be updated soon.</p>
+                  <p className="text-[14px] font-medium text-[#6B7F98] sm:text-[15px]">Activities will be updated soon.</p>
                 )}
 
                 {(day.meals || day.accommodation) && (
