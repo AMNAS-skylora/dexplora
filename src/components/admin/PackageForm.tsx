@@ -9,6 +9,7 @@ import Link from "next/link";
 import { PackageCoverUploader } from "./PackageCoverUploader";
 import { DestinationSearchSelector, DestinationOption } from "./DestinationSearchSelector";
 import { ItineraryDayUploader } from "./ItineraryDayUploader";
+import { normalizeLegacyCancellationCharges } from "@/lib/cancellation-policy";
 
 export interface PackageInitialData {
   id?: string;
@@ -807,7 +808,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
         <label className="block space-y-1">
           <span className="text-xs font-bold text-[#0B1026]">Custom Cancellation Charges — Optional</span>
           <textarea name="cancellationChargesOverride" rows={6}
-            defaultValue={initialData?.cancellationChargesOverride || ""}
+            defaultValue={normalizeLegacyCancellationCharges(initialData?.cancellationChargesOverride)}
             placeholder={"30 days or more before departure|10\n15–29 days before departure|25\n7–14 days before departure|50"}
             className="w-full rounded-xl border border-[#E8ECF3] bg-[#F3F7FF] px-3.5 py-3 font-mono text-xs leading-relaxed text-[#0B1026] sm:text-sm" />
           <span className="block text-xs text-[#64748B]">One row per period, formatted Period|Percentage. Blank = global charges.</span>
