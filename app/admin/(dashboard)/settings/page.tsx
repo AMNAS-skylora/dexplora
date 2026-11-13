@@ -32,6 +32,10 @@ export default async function AdminSettingsPage() {
           seo_title: formData.get("seo_title") as string,
           seo_description: formData.get("seo_description") as string,
           footer_text: formData.get("footer_text") as string,
+          booking_advance_percent: String(formData.get("booking_advance_percent") ?? "30"),
+          cancellation_charges: String(formData.get("cancellation_charges") ?? ""),
+          cancellation_notes: String(formData.get("cancellation_notes") ?? ""),
+          important_notice: String(formData.get("important_notice") ?? ""),
         };
         await updateSiteSettings(newSettings);
       }} className="space-y-6">
@@ -197,6 +201,41 @@ export default async function AdminSettingsPage() {
             />
           </div>
         </div>
+
+        {/* 4. Cancellation & Refund Policy — global defaults for every package */}
+        <section className="rounded-3xl border border-[#D8E5F6] bg-white p-5 shadow-sm space-y-5 sm:p-6">
+          <div className="space-y-1">
+            <h2 className="text-base font-extrabold text-[#0B1026]">4. Cancellation & Refund Policy</h2>
+            <p className="text-xs leading-relaxed text-[#667085]">
+              Default policy shown on all tour package pages and the public policy page.
+              Individual packages can override these values in Edit Package.
+            </p>
+          </div>
+          <label className="block space-y-1">
+            <span className="text-xs font-bold text-[#0B1026]">Booking Advance (% per person)</span>
+            <input type="number" name="booking_advance_percent" min="0" max="100" step="0.01" required
+              defaultValue={settings.booking_advance_percent}
+              className="min-h-11 w-full rounded-xl border border-[#D8E5F6] bg-[#F3F7FF] px-3.5 py-2.5 text-sm font-bold text-[#0B1026]" />
+            <span className="block text-xs text-[#64748B]">The advance is marked non-refundable in the public policy.</span>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-bold text-[#0B1026]">Cancellation Charges (one period per line)</span>
+            <textarea name="cancellation_charges" rows={7} required defaultValue={settings.cancellation_charges}
+              placeholder={"30 days or more before departure|10\n15–29 days before departure|25"}
+              className="w-full rounded-xl border border-[#D8E5F6] bg-[#F3F7FF] px-3.5 py-3 font-mono text-xs leading-relaxed text-[#0B1026] sm:text-sm" />
+            <span className="block text-xs text-[#64748B]">Format: Cancellation Period|Percentage (for example: Within 7 days of departure|100). The website displays a two-column table.</span>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-bold text-[#0B1026]">Cancellation Notes</span>
+            <textarea name="cancellation_notes" rows={3} maxLength={2000} defaultValue={settings.cancellation_notes}
+              className="w-full rounded-xl border border-[#D8E5F6] bg-[#F3F7FF] px-3.5 py-3 text-sm leading-relaxed text-[#0B1026]" />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-bold text-[#0B1026]">Important Notice (all packages)</span>
+            <textarea name="important_notice" rows={4} maxLength={3000} defaultValue={settings.important_notice}
+              className="w-full rounded-xl border border-[#D8E5F6] bg-[#F3F7FF] px-3.5 py-3 text-sm leading-relaxed text-[#0B1026]" />
+          </label>
+        </section>
 
         <button
           type="submit"
