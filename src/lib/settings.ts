@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { DEFAULT_CANCELLATION_CHARGES, DEFAULT_CANCELLATION_NOTES, DEFAULT_IMPORTANT_NOTICE } from "@/lib/cancellation-policy";
+import { DEFAULT_CANCELLATION_CHARGES, DEFAULT_CANCELLATION_NOTES, DEFAULT_IMPORTANT_NOTICE, normalizeLegacyCancellationCharges } from "@/lib/cancellation-policy";
 
 export interface SiteSettingsMap {
   company_name: string;
@@ -56,6 +56,10 @@ export async function getSiteSettings(): Promise<SiteSettingsMap> {
         (map as any)[s.key] = s.value;
       }
     }
+    // Saved legacy default policies adopt the new default charges.
+    // Any genuinely customized cancellation rules remain untouched.
+    map.cancellation_charges =
+      normalizeLegacyCancellationCharges(map.cancellation_charges) || DEFAULT_CANCELLATION_CHARGES;
     return map;
   } catch (error) {
     return defaultSettings;
