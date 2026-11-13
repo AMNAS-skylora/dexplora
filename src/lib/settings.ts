@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { DEFAULT_CANCELLATION_CHARGES, DEFAULT_CANCELLATION_NOTES, DEFAULT_IMPORTANT_NOTICE } from "@/lib/cancellation-policy";
 
 export interface SiteSettingsMap {
   company_name: string;
@@ -17,6 +18,10 @@ export interface SiteSettingsMap {
   footer_text: string;
   booking_auto_cleanup_enabled: string;
   booking_retention_days: string;
+  booking_advance_percent: string;
+  cancellation_charges: string;
+  cancellation_notes: string;
+  important_notice: string;
 }
 
 export const defaultSettings: SiteSettingsMap = {
@@ -36,6 +41,10 @@ export const defaultSettings: SiteSettingsMap = {
   footer_text: "Dexplora Tour Planners is a premier Kerala-based travel company specializing in budget group departures.",
   booking_auto_cleanup_enabled: "false",
   booking_retention_days: "30",
+  booking_advance_percent: "30",
+  cancellation_charges: DEFAULT_CANCELLATION_CHARGES,
+  cancellation_notes: DEFAULT_CANCELLATION_NOTES,
+  important_notice: DEFAULT_IMPORTANT_NOTICE,
 };
 
 export async function getSiteSettings(): Promise<SiteSettingsMap> {
