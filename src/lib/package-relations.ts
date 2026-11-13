@@ -1,3 +1,5 @@
+import { normalizeItineraryTransportMode, type ItineraryTransportMode } from "@/lib/itinerary-transport";
+
 /**
  * Dexplora uses the native MongoDB adapter, not Prisma nested writes.
  * Store package relation-like content as real arrays in the Package document.
@@ -11,6 +13,9 @@ export interface ItineraryInput {
   imageUrl?: string | null;
   meals?: string | null;
   accommodation?: string | null;
+  stopName?: string | null;
+  transportMode?: ItineraryTransportMode | string | null;
+  transportNote?: string | null;
 }
 export interface PackageEmbeddedInput {
   images?: Array<{ url: string; caption?: string | null }>;
@@ -38,6 +43,9 @@ export function buildPackageEmbeddedRelations(data: PackageEmbeddedInput) {
         image: imageUrl,
         meals: clean(day.meals) || null,
         accommodation: clean(day.accommodation) || null,
+        stopName: clean(day.stopName).slice(0,100) || null,
+        transportMode: normalizeItineraryTransportMode(day.transportMode),
+        transportNote: clean(day.transportNote).slice(0,180) || null,
         displayOrder: index,
       };
     }),
