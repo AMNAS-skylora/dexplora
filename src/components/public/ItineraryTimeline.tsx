@@ -1,16 +1,10 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef } from "react";
 import Image from "next/image";
-import {
-  Bike, BusFront, CalendarDays, CarFront, ChevronDown,
-  Footprints, MapPin, Plane, Route, Ship, TrainFront, Truck,
-} from "lucide-react";
-import {
-  ITINERARY_TRANSPORT_MODES,
-  normalizeItineraryTransportMode,
-  type ItineraryTransportMode,
-} from "@/lib/itinerary-transport";
+import { CalendarDays, MapPin } from "lucide-react";
+import { itineraryTransportIcons } from "@/components/ItineraryTransportIcons";
+import { ITINERARY_TRANSPORT_MODES, normalizeItineraryTransportMode } from "@/lib/itinerary-transport";
 
 export interface ItineraryTimelineDay {
   id?: string;
@@ -72,18 +66,6 @@ function safePhotoUrl(value: string | null | undefined): string | null {
   return (url.startsWith("/") && !url.startsWith("//")) || /^https:\/\//i.test(url) ? url : null;
 }
 
-const travelIcons = {
-  none: Route,
-  car: CarFront,
-  van: Truck,
-  bus: BusFront,
-  train: TrainFront,
-  plane: Plane,
-  ship: Ship,
-  bike: Bike,
-  walk: Footprints,
-} as const;
-
 function routeCaption(current: ItineraryTimelineDay, next: ItineraryTimelineDay): string {
   const custom = String(current.transportNote || "").trim();
   if (custom) return custom;
@@ -101,68 +83,110 @@ function TransportRoute({
   to: ItineraryTimelineDay;
   index: number;
 }) {
-  const mode: ItineraryTransportMode = normalizeItineraryTransportMode(from.transportMode);
-  const Icon = travelIcons[mode];
+  const mode = normalizeItineraryTransportMode(from.transportMode);
+  const Icon = itineraryTransportIcons[mode];
+  const modeLabel = ITINERARY_TRANSPORT_MODES.find((entry) => entry.value === mode)?.label;
   const caption = routeCaption(from, to);
-  const isReversed = index % 2 === 1;
+  const curve = index % 2 === 0
+    ? "M 72 0 C 110 85 290 120 500 120 S 860 156 928 240"
+    : "M 928 0 C 890 85 710 120 500 120 S 140 156 72 240";
+
   return (
-    <div className="relative z-0 h-[166px] w-full overflow-visible sm:h-[190px]" aria-label={caption}>
+    <div className="relative grid min-h-36 w-full grid-rows-2 justify-items-center text-center sm:min-h-44">
       <svg
         aria-hidden="true"
         focusable="false"
+        data-itinerary-route
         viewBox="0 0 1000 240"
         preserveAspectRatio="none"
-        className="pointer-events-none absolute inset-0 h-full w-full"
+        className="pointer-events-none absolute inset-0 w-full"
+        style={{ height: "100%" }}
       >
         <path
-          d={isReversed
-            ? "M 920 -10 C 880 90 710 150 500 123 S 160 100 72 252"
-            : "M 72 -10 C 116 86 296 153 500 121 S 852 105 930 252"}
+          d={curve}
           fill="none"
-          stroke="#A1AFD0"
-          strokeWidth="5"
-          strokeDasharray="12 13"
+          stroke="#A8BBDD"
+          strokeWidth="3"
+          strokeDasharray="3 7"
           strokeLinecap="round"
           vectorEffect="non-scaling-stroke"
         />
+        <path
+          data-route-progress
+          d={curve}
+          fill="none"
+          stroke="var(--primary-blue)"
+          strokeWidth="3"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+          pathLength="1"
+          strokeDasharray="1 1"
+          className="[stroke-dashoffset:var(--route-offset,1)]"
+        />
       </svg>
-      <div className="absolute inset-x-0 top-[42%] flex -translate-y-1/2 flex-col items-center justify-center gap-2 px-8 text-center">
-        <span
-          className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-full border-2 border-[#BACBE9] bg-[#F9FBFF] text-[#3D619C] shadow-[0_4px_18px_rgba(31,77,136,0.12)] sm:h-[76px] sm:w-[76px]"
-          title={ITINERARY_TRANSPORT_MODES.find((entry) => entry.value === mode)?.label || "Travel route"}
-        >
-          <Icon size={31} strokeWidth={1.8} aria-hidden="true" />
-        </span>
-        <p className="max-w-[270px] break-words rounded-lg bg-[#F2F7FF]/95 px-2 py-1 text-center text-[13px] font-bold leading-snug text-[#213450] sm:max-w-[450px] sm:text-[16px]">
-          {caption}
-        </p>
-      </div>
+      <span className="absolute left-1/2 top-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[#C9DBF8] bg-white text-[#2563EB] shadow-sm sm:size-14">
+        <Icon size={25} strokeWidth={1.8} aria-hidden="true" />
+        {mode !== "none" && <span className="sr-only">{modeLabel}</span>}
+      </span>
+      <p className="relative row-start-2 mx-5 mb-2 mt-7 max-w-[85%] self-start rounded-lg bg-[#F2F7FF] px-2 py-1 text-[13px] font-bold text-[#213450] [overflow-wrap:anywhere] sm:mt-8 sm:text-base">
+        {caption}
+      </p>
     </div>
   );
 }
 
-/**
- * Interactive accordion itinerary with the user's screenshot-style serpentine
- * travel route. A journey day retains its picture, time-stamped activities and
- * departure-specific date. No database operation happens on expand/collapse.
- */
 export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProps) {
   const headingId = useId();
+  const routeList = useRef<HTMLOListElement>(null);
   const ordered = (Array.isArray(days) ? days : [])
     .filter((day) => Number.isFinite(Number(day.dayNumber)))
-    .slice()
     .sort((a, b) => Number(a.dayNumber) - Number(b.dayNumber));
-  const [expanded, setExpanded] = useState<number[]>([0]);
+  const dayCount = ordered.length;
 
-  if (!ordered.length) return null;
+  useEffect(() => {
+    const list = routeList.current;
+    if (!list || dayCount < 2) return;
 
-  function toggleDay(index: number) {
-    setExpanded((previous) =>
-      previous.includes(index)
-        ? previous.filter((item) => item !== index)
-        : [...previous, index],
-    );
-  }
+    const routes = Array.from(list.querySelectorAll<SVGSVGElement>("[data-itinerary-route]"));
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame: number | null = null;
+
+    function paintRoutes() {
+      frame = null;
+      const readingLine = window.innerHeight * 0.62;
+      const offsets = routes.map((route) => {
+        if (reducedMotion.matches) return 0;
+
+        const bounds = route.getBoundingClientRect();
+        const progress = (readingLine - bounds.top) / Math.max(bounds.height, 1);
+        return 1 - Math.min(1, Math.max(0, progress));
+      });
+      routes.forEach((route, index) => {
+        route.style.setProperty("--route-offset", String(offsets[index]));
+      });
+    }
+
+    function schedulePaint() {
+      if (frame === null) frame = window.requestAnimationFrame(paintRoutes);
+    }
+
+    const observer = new ResizeObserver(schedulePaint);
+    observer.observe(list);
+    window.addEventListener("scroll", schedulePaint, { passive: true });
+    window.addEventListener("resize", schedulePaint);
+    reducedMotion.addEventListener("change", schedulePaint);
+    schedulePaint();
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", schedulePaint);
+      window.removeEventListener("resize", schedulePaint);
+      reducedMotion.removeEventListener("change", schedulePaint);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [dayCount]);
+
+  if (!dayCount) return null;
 
   return (
     <section
@@ -170,9 +194,6 @@ export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProp
       className="w-full min-w-0 rounded-[24px] bg-[#F2F7FF] px-3.5 py-6 text-[#192B4A] sm:px-6 sm:py-8 lg:px-9"
     >
       <header className="mb-6 sm:mb-9">
-        <p className="mb-1.5 text-[10px] font-extrabold tracking-[0.2em] text-[#3769B3]">
-          YOUR JOURNEY
-        </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id={headingId} className="text-[clamp(23px,5vw,34px)] font-extrabold leading-tight tracking-[-0.03em]">
             Day-by-Day Itinerary
@@ -181,63 +202,40 @@ export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProp
             {ordered.length} {ordered.length === 1 ? "Day" : "Days"}
           </span>
         </div>
-        <p className="mt-2 text-xs leading-relaxed text-[#62748D] sm:text-sm">
-          Explore the route, transport and highlights of each day.
-        </p>
       </header>
 
-      <ol className="min-w-0">
+      <div className="ml-[7.2%] flex items-center gap-2 pb-3 text-sm font-bold text-[#174B8C]">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#2563EB] text-white">
+          <MapPin size={19} aria-hidden="true" />
+        </span>
+        Trip starts
+      </div>
+
+      <ol ref={routeList} className="min-w-0">
         {ordered.map((day, index) => {
           const number = Number(day.dayNumber) || index + 1;
           const date = dayDate(departureDate, number);
           const imageUrl = safePhotoUrl(day.imageUrl || day.image);
           const activities = parseItineraryActivities(day.description);
-          const opened = expanded.includes(index);
-          const panelId = headingId + "-day-" + index;
           const stop = String(day.stopName || "").trim();
           const title = String(day.title || "").trim();
           return (
             <li key={day.id || "day-" + number + "-" + index} className="relative min-w-0">
-              <article className="relative z-10 min-w-0 rounded-[22px] border border-[#CFDFF5] bg-[#E6F1FF] shadow-[0_5px_14px_rgba(31,77,136,0.05)]">
-                <h3>
-                  <button
-                    type="button"
-                    aria-expanded={opened}
-                    aria-controls={panelId}
-                    onClick={() => toggleDay(index)}
-                    className="group flex min-h-[80px] w-full min-w-0 items-center gap-3 rounded-[22px] px-3.5 py-3.5 text-left transition-colors hover:bg-[#DCEBFF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3478F6] sm:min-h-[94px] sm:gap-5 sm:px-6"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#316DA8] sm:h-9 sm:w-9"
-                    >
-                      <span className="h-3.5 w-3.5 rounded-full bg-white sm:h-4 sm:w-4" />
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 text-[17px] font-extrabold leading-tight text-[#192B4A] sm:gap-x-3 sm:text-[22px]">
-                      <span className="shrink-0">Day {String(number).padStart(2, "0")}</span>
-                      {stop && (
-                        <>
-                          <span aria-hidden="true" className="shrink-0 text-[#7EB6F3]">•</span>
-                          <span className="min-w-0 break-words">{stop}</span>
-                        </>
-                      )}
-                    </span>
-                    <span
-                      aria-hidden="true"
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-[#8DA5CB] bg-white/70 text-[#3C598A] transition-transform sm:h-12 sm:w-12"
-                    >
-                      <ChevronDown className={"h-6 w-6 transition-transform duration-200 " + (opened ? "rotate-180" : "rotate-0")} strokeWidth={2.3} />
-                    </span>
-                  </button>
+              <article className="relative z-10 min-w-0 overflow-hidden rounded-[22px] border border-[#CFDFF5] bg-[#E6F1FF] shadow-[0_5px_14px_rgba(31,77,136,0.05)]">
+                <h3 className="flex min-h-16 items-center gap-3 px-3.5 py-3.5 text-[17px] font-extrabold leading-tight sm:min-h-20 sm:gap-4 sm:px-6 sm:text-[22px]">
+                  <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#2563EB] sm:size-8">
+                    <span className="size-2.5 rounded-full bg-white sm:size-3" />
+                  </span>
+                  <span className="shrink-0">Day {String(number).padStart(2, "0")}</span>
+                  {stop && (
+                    <>
+                      <span aria-hidden="true" className="shrink-0 text-[#3478F6]">•</span>
+                      <span className="min-w-0 [overflow-wrap:anywhere]">{stop}</span>
+                    </>
+                  )}
                 </h3>
 
-                <div
-                  id={panelId}
-                  role="region"
-                  aria-label={"Details for day " + number}
-                  hidden={!opened}
-                  className="border-t border-[#C8DBF6] bg-white/85 px-4 pb-5 pt-5 sm:px-6 sm:pb-7"
-                >
+                <div className="rounded-b-[22px] border-t border-[#C8DBF6] bg-white/85 px-4 pb-5 pt-5 sm:px-6 sm:pb-7">
                   <div className={"min-w-0 " + (imageUrl ? "grid grid-cols-1 items-start gap-5 sm:grid-cols-[160px_minmax(0,1fr)] sm:gap-7 lg:grid-cols-[205px_minmax(0,1fr)]" : "")}>
                     {imageUrl && (
                       <div className="mx-auto w-[200px] max-w-[88%] -rotate-[2deg] bg-white p-2 pb-5 shadow-[0_12px_26px_rgba(28,72,137,0.16)] sm:mx-0 sm:w-full">
@@ -251,20 +249,21 @@ export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProp
                       </div>
                     )}
                     <div className="min-w-0">
-                      <div className="mb-4 space-y-2">
-                        <p className="text-[10px] font-extrabold uppercase tracking-[0.17em] text-[#3769B3]">
-                          DAILY HIGHLIGHTS
-                        </p>
-                        <h4 className="break-words text-[18px] font-extrabold leading-snug text-[#192B4A] sm:text-[21px]">
-                          {title || stop || "Day " + number}
-                        </h4>
-                        {date && (
-                          <p className="flex items-center gap-1.5 text-xs font-semibold text-[#59749B]">
-                            <CalendarDays size={15} aria-hidden="true" />
-                            <time>{date}</time>
-                          </p>
-                        )}
-                      </div>
+                      {((title && title !== stop) || date) && (
+                        <div className="mb-4 space-y-2">
+                          {title && title !== stop && (
+                            <h4 className="text-[18px] font-extrabold leading-snug text-[#192B4A] [overflow-wrap:anywhere] sm:text-[21px]">
+                              {title}
+                            </h4>
+                          )}
+                          {date && (
+                            <p className="flex items-center gap-1.5 text-xs font-semibold text-[#59749B]">
+                              <CalendarDays size={15} aria-hidden="true" />
+                              <time>{date}</time>
+                            </p>
+                          )}
+                        </div>
+                      )}
                       {activities.length > 0 ? (
                         <ul className="space-y-3.5" aria-label={"Day " + number + " activities"}>
                           {activities.map((entry, activityIndex) => (

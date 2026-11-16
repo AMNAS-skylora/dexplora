@@ -368,7 +368,7 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
                 packageData={pkg}
                 selectedDeparture={nextBatch}
                 whatsappNumber={settings?.whatsapp_number}
-                className="w-full h-[50px] bg-[#3478F6] hover:bg-[#2563EB] text-white font-bold text-sm sm:text-base rounded-xl shadow-xs transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full h-[50px] bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm sm:text-base rounded-xl shadow-xs transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Book Seats Now</span>
                 <ArrowRight className="w-4 h-4" />
@@ -573,7 +573,7 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
                 packageData={pkg}
                 selectedDeparture={nextBatch}
                 whatsappNumber={settings?.whatsapp_number}
-                className="w-full h-[48px] bg-[#3478F6] hover:bg-[#2563EB] text-white font-bold text-sm rounded-xl shadow-xs transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full h-[48px] bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold text-sm rounded-xl shadow-xs transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Book This Package</span>
                 <ArrowRight className="w-4 h-4" />

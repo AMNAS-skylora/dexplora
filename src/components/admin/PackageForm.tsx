@@ -9,6 +9,7 @@ import Link from "next/link";
 import { PackageCoverUploader } from "./PackageCoverUploader";
 import { DestinationSearchSelector, DestinationOption } from "./DestinationSearchSelector";
 import { ItineraryDayUploader } from "./ItineraryDayUploader";
+import { itineraryTransportIcons } from "@/components/ItineraryTransportIcons";
 import { normalizeLegacyCancellationCharges } from "@/lib/cancellation-policy";
 import { ITINERARY_TRANSPORT_MODES, normalizeItineraryTransportMode, type ItineraryTransportMode } from "@/lib/itinerary-transport";
 
@@ -42,7 +43,7 @@ export interface PackageInitialData {
   cancellationNotesOverride?: string | null;
   importantNoticeOverride?: string | null;
   images?: Array<{ url: string; caption?: string | null }>;
-  itineraries?: Array<{ dayNumber: number; title: string; description: string; imageUrl?: string | null; meals?: string | null; accommodation?: string | null; stopName?: string | null; transportMode?: string | null; transportNote?: string | null }>;
+  itineraries?: Array<{ dayNumber: number; title: string; description: string; imageUrl?: string | null; image?: string | null; meals?: string | null; accommodation?: string | null; stopName?: string | null; transportMode?: string | null; transportNote?: string | null }>;
   inclusions?: Array<{ text: string }>;
   exclusions?: Array<{ text: string }>;
   faqs?: Array<{ question: string; answer: string }>;
@@ -150,13 +151,15 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
   };
 
   // Dynamic Itinerary state with day images
-  const [itineraries, setItineraries] = useState<Array<{ dayNumber: number; title: string; description: string; imageUrl?: string; stopName: string; transportMode: ItineraryTransportMode; transportNote: string }>>(
+  const [itineraries, setItineraries] = useState<Array<{ dayNumber: number; title: string; description: string; imageUrl?: string; meals?: string | null; accommodation?: string | null; stopName: string; transportMode: ItineraryTransportMode; transportNote: string }>>(
     Array.isArray(initialData?.itineraries)
       ? initialData.itineraries.map((it, idx) => ({
           dayNumber: idx + 1,
           title: it.title || "",
           description: it.description || "",
-          imageUrl: it.imageUrl || "",
+          imageUrl: it.imageUrl || it.image || "",
+          meals: it.meals,
+          accommodation: it.accommodation,
           stopName: it.stopName || "",
           transportMode: normalizeItineraryTransportMode(it.transportMode),
           transportNote: it.transportNote || "",
@@ -274,6 +277,8 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
         title: it.title.trim() || "Day " + (idx + 1),
         description: it.description,
         imageUrl: it.imageUrl || null,
+        meals: it.meals,
+        accommodation: it.accommodation,
         stopName: it.stopName.trim() || null,
         transportMode: it.transportMode,
         transportNote: it.transportNote.trim() || null,
@@ -794,7 +799,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
                       the selected icon and transfer caption appear on the curved route to that day.
                     </p>
                   </div>
-                  <label className="block space-y-1">
+                  <label className="block space-y-1 sm:col-span-2">
                     <span className="text-xs font-bold text-[#0B1026]">Day Location / Stop</span>
                     <input type="text" maxLength={100}
                       value={it.stopName}
@@ -802,16 +807,32 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
                       placeholder="e.g. Munnar"
                       className="min-h-11 w-full rounded-xl border border-[#E8ECF3] bg-[#F8FAFC] px-3 text-sm font-semibold text-[#0B1026] outline-none focus:border-[#3478F6]" />
                   </label>
-                  <label className="block space-y-1">
-                    <span className="text-xs font-bold text-[#0B1026]">Transport Icon (To Next Day)</span>
-                    <select value={it.transportMode}
-                      onChange={(e) => setItineraries((prev) => prev.map((day, i) => i === idx ? { ...day, transportMode: normalizeItineraryTransportMode(e.target.value) } : day))}
-                      className="min-h-11 w-full rounded-xl border border-[#E8ECF3] bg-[#F8FAFC] px-3 text-sm font-semibold text-[#0B1026] outline-none focus:border-[#3478F6]">
-                      {ITINERARY_TRANSPORT_MODES.map((mode) => (
-                        <option key={mode.value} value={mode.value}>{mode.label}</option>
-                      ))}
-                    </select>
-                  </label>
+                  <fieldset className="min-w-0 space-y-2 sm:col-span-2">
+                    <legend className="text-xs font-bold text-[#0B1026]">Transport Icon (To Next Day)</legend>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {ITINERARY_TRANSPORT_MODES.map((mode) => {
+                        const Icon = itineraryTransportIcons[mode.value];
+                        return (
+                          <label key={mode.value} className="relative min-w-0 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={"itineraryTransport-" + idx}
+                              value={mode.value}
+                              checked={it.transportMode === mode.value}
+                              onChange={() => setItineraries((previous) => previous.map((day, dayIndex) =>
+                                dayIndex === idx ? { ...day, transportMode: mode.value } : day,
+                              ))}
+                              className="peer sr-only"
+                            />
+                            <span className="flex h-full min-h-12 items-center gap-2 rounded-xl border border-[#E8ECF3] bg-[#F8FAFC] px-2.5 py-2 text-xs font-semibold text-[#334155] peer-checked:border-[#3478F6] peer-checked:bg-[#EAF2FF] peer-checked:text-[#174B8C] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#3478F6]">
+                              <Icon className="size-5 shrink-0 text-[#2563EB]" aria-hidden="true" />
+                              <span>{mode.label}</span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
                   <label className="block space-y-1 sm:col-span-2">
                     <span className="text-xs font-bold text-[#0B1026]">Transfer Text (To Next Day)</span>
                     <input type="text" maxLength={180}

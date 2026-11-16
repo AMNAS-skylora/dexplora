@@ -72,7 +72,7 @@ export function MobileBookingBar({
           <button
             type="button"
             onClick={handleBooking}
-            className="bg-[#3478F6] hover:bg-[#2563EB] text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-transform min-h-[44px] cursor-pointer"
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-transform min-h-[44px] cursor-pointer"
           >
             <Calendar className="w-3.5 h-3.5" />
             <span>Book Now</span>
