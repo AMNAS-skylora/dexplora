@@ -448,11 +448,11 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
                     <XCircle className="w-4.5 h-4.5 shrink-0 stroke-[2.5]" />
                     <h3 className="font-bold text-sm sm:text-base">What&apos;s Not Included</h3>
                   </div>
-                  <ul className="space-y-2 text-xs text-[#1E293B] font-medium">
+                  <ul className="space-y-2.5 text-[14px] font-bold leading-relaxed text-[#1E293B] sm:text-[15px]">
                     {exclusions.map((exc: { id?: string; text: string }, idx: number) => (
                       <li key={exc.id || `exc-${idx}`} className="flex items-start gap-2">
-                        <span className="text-[#DC2626] font-bold">✕</span>
-                        <span className="break-words">{exc.text}</span>
+                        <span aria-hidden="true" className="shrink-0 text-[#DC2626]">✕</span>
+                        <span className="min-w-0 [overflow-wrap:anywhere]">{exc.text}</span>
                       </li>
                     ))}
                   </ul>

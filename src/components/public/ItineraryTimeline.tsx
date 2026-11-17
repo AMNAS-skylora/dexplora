@@ -76,6 +76,8 @@ function routeCaption(current: ItineraryTimelineDay, next: ItineraryTimelineDay)
   return mode !== "none" && modeLabel ? "Travel by " + modeLabel : "Continue the journey";
 }
 
+const ROUTE_VIEWBOX_HEIGHT = 240;
+
 function TransportRoute({
   from, to, index,
 }: {
@@ -83,6 +85,7 @@ function TransportRoute({
   to: ItineraryTimelineDay;
   index: number;
 }) {
+  const clipId = useId();
   const mode = normalizeItineraryTransportMode(from.transportMode);
   const Icon = itineraryTransportIcons[mode];
   const modeLabel = ITINERARY_TRANSPORT_MODES.find((entry) => entry.value === mode)?.label;
@@ -97,11 +100,16 @@ function TransportRoute({
         aria-hidden="true"
         focusable="false"
         data-itinerary-route
-        viewBox="0 0 1000 240"
+        viewBox={`0 0 1000 ${ROUTE_VIEWBOX_HEIGHT}`}
         preserveAspectRatio="none"
         className="pointer-events-none absolute inset-0 w-full"
         style={{ height: "100%" }}
       >
+        <defs>
+          <clipPath id={clipId}>
+            <rect data-route-fill width="1000" height="0" />
+          </clipPath>
+        </defs>
         <path
           d={curve}
           fill="none"
@@ -112,16 +120,13 @@ function TransportRoute({
           vectorEffect="non-scaling-stroke"
         />
         <path
-          data-route-progress
           d={curve}
           fill="none"
           stroke="var(--primary-blue)"
-          strokeWidth="3"
+          strokeWidth="4"
           strokeLinecap="round"
           vectorEffect="non-scaling-stroke"
-          pathLength="1"
-          strokeDasharray="1 1"
-          className="[stroke-dashoffset:var(--route-offset,1)]"
+          clipPath={`url(#${clipId})`}
         />
       </svg>
       <span className="absolute left-1/2 top-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[#C9DBF8] bg-white text-[#2563EB] shadow-sm sm:size-14">
@@ -147,22 +152,26 @@ export function ItineraryTimeline({ days, departureDate }: ItineraryTimelineProp
     const list = routeList.current;
     if (!list || dayCount < 2) return;
 
-    const routes = Array.from(list.querySelectorAll<SVGSVGElement>("[data-itinerary-route]"));
+    const fills = Array.from(list.querySelectorAll<SVGRectElement>("[data-route-fill]"));
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame: number | null = null;
 
     function paintRoutes() {
       frame = null;
-      const readingLine = window.innerHeight * 0.62;
-      const offsets = routes.map((route) => {
-        if (reducedMotion.matches) return 0;
+      const readingLine = window.innerHeight * 0.68;
+      const heights = fills.map((fill) => {
+        if (reducedMotion.matches) return ROUTE_VIEWBOX_HEIGHT;
 
-        const bounds = route.getBoundingClientRect();
-        const progress = (readingLine - bounds.top) / Math.max(bounds.height, 1);
-        return 1 - Math.min(1, Math.max(0, progress));
+        const bounds = fill.ownerSVGElement?.getBoundingClientRect();
+        if (!bounds?.height) return 0;
+
+        // Both curves descend throughout, so clipping by height follows the scroll position.
+        const progress = (readingLine - bounds.top) / bounds.height;
+        return ROUTE_VIEWBOX_HEIGHT * Math.min(1, Math.max(0, progress));
       });
-      routes.forEach((route, index) => {
-        route.style.setProperty("--route-offset", String(offsets[index]));
+      fills.forEach((fill, index) => {
+        const height = String(heights[index]);
+        if (fill.getAttribute("height") !== height) fill.setAttribute("height", height);
       });
     }
 
