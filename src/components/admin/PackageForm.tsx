@@ -11,6 +11,8 @@ import { DestinationSearchSelector, DestinationOption } from "./DestinationSearc
 import { ItineraryDayUploader } from "./ItineraryDayUploader";
 import { itineraryTransportIcons } from "@/components/ItineraryTransportIcons";
 import { normalizeLegacyCancellationCharges } from "@/lib/cancellation-policy";
+import { PackagePriceCardsEditor, type PriceCardDraft } from "./PackagePriceCardsEditor";
+import { validatePriceCards, type PriceCard } from "@/lib/package-price-cards";
 import { ITINERARY_TRANSPORT_MODES, normalizeItineraryTransportMode, type ItineraryTransportMode } from "@/lib/itinerary-transport";
 
 export interface PackageInitialData {
@@ -24,6 +26,7 @@ export interface PackageInitialData {
   coverImage?: string;
   duration?: string;
   price?: number;
+  priceCards?: PriceCard[];
   originalPrice?: number | null;
   expensePerPerson?: number;
   departureLocation?: string;
@@ -78,6 +81,7 @@ function parseDurationString(durationStr?: string | null): { days: number; night
 export function PackageForm({ destinations, initialData }: PackageFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [priceCards, setPriceCards] = useState<PriceCardDraft[]>(() => (Array.isArray(initialData?.priceCards) ? initialData.priceCards : []).map(card => ({ ...card, price: String(card.price) })));
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
 
@@ -234,6 +238,8 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       return;
     }
 
+    const chart = validatePriceCards(priceCards.map(card => ({ ...card, price: card.price.trim() ? Number(card.price) : NaN })));
+    if (chart.error !== undefined) { setError(chart.error); return; }
     setLoading(true);
 
     try {
@@ -250,6 +256,7 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
       coverImage: coverImage.trim(),
       duration: generatedDuration,
       price: Number(formData.get("price")),
+      priceCards: chart.cards,
       originalPrice: formData.get("originalPrice") ? Number(formData.get("originalPrice")) : null,
       expensePerPerson: Math.max(0, Number(formData.get("expensePerPerson")) || 0),
       departureLocation: (formData.get("departureLocation") as string) || "Kerala",
@@ -536,6 +543,8 @@ export function PackageForm({ destinations, initialData }: PackageFormProps) {
           />
         </div>
       </div>
+
+      <PackagePriceCardsEditor cards={priceCards} onChange={setPriceCards} disabled={loading} />
 
       {/* 2. Pricing & Key Logistics */}
       <div className="bg-white rounded-3xl p-6 border border-[#E8ECF3] shadow-sm space-y-5">

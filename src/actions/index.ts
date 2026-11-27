@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb";
 import { normalizeDepartureInput } from "@/lib/departure-rules";
 import { notifyBookingEvent } from "@/lib/email/booking-notifications";
 import { buildPackageEmbeddedRelations } from "@/lib/package-relations";
+import { validatePriceCards, type PriceCard } from "@/lib/package-price-cards";
 import { parseCancellationCharges, validateCancellationSettings } from "@/lib/cancellation-policy";
 import { calculateBookingBilling, createInitialBillingRows, getBookingBillingRows, type TravellerBenefit, type TravellerExtraCharge } from "@/lib/traveller-billing";
 import { setAdminSessionCookie, clearAdminSessionCookie, getAdminSession } from "@/lib/auth";
@@ -290,6 +291,7 @@ export interface PackageInputData {
   coverImage: string;
   duration: string;
   price: number;
+  priceCards?: PriceCard[];
   originalPrice?: number | null;
   expensePerPerson?: number;
   departureLocation: string;
@@ -419,6 +421,8 @@ export async function createPackage(data: PackageInputData) {
   if (!session) return { error: "Unauthorized" };
 
   try {
+    const chart = validatePriceCards(data.priceCards === undefined ? [] : data.priceCards);
+    if (chart.error !== undefined) return { error: chart.error };
     if (data.bookingAdvancePercentOverride != null) {
       const percent = Number(data.bookingAdvancePercentOverride);
       if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
@@ -463,6 +467,7 @@ export async function createPackage(data: PackageInputData) {
         coverImage: data.coverImage,
         duration: data.duration,
         price: Number(data.price),
+        ...(data.priceCards !== undefined ? { priceCards: chart.cards } : {}),
         originalPrice: data.originalPrice ? Number(data.originalPrice) : null,
         expensePerPerson: Math.max(0, Number(data.expensePerPerson) || 0),
         departureLocation: data.departureLocation,
@@ -505,6 +510,8 @@ export async function updatePackage(id: string, data: PackageInputData) {
   if (!session) return { error: "Unauthorized" };
 
   try {
+    const chart = validatePriceCards(data.priceCards === undefined ? [] : data.priceCards);
+    if (chart.error !== undefined) return { error: chart.error };
     if (data.bookingAdvancePercentOverride != null) {
       const percent = Number(data.bookingAdvancePercentOverride);
       if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
@@ -545,6 +552,7 @@ export async function updatePackage(id: string, data: PackageInputData) {
         coverImage: data.coverImage,
         duration: data.duration,
         price: Number(data.price),
+        ...(data.priceCards !== undefined ? { priceCards: chart.cards } : {}),
         originalPrice: data.originalPrice ? Number(data.originalPrice) : null,
         expensePerPerson: Math.max(0, Number(data.expensePerPerson) || 0),
         departureLocation: data.departureLocation,
