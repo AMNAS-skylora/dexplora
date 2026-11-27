@@ -6,6 +6,7 @@ import { PackageBookingButton } from "@/components/public/PackageBookingCTA";
 import { PackageCard } from "@/components/public/PackageCard";
 import { PackageDeparturesCalendar } from "@/components/public/PackageDeparturesCalendar";
 import { CancellationPolicySection } from "@/components/public/CancellationPolicySection";
+import { PackagePriceChart } from "@/components/public/PackagePriceChart";
 import { resolveCancellationPolicy } from "@/lib/cancellation-policy";
 import { ItineraryTimeline } from "@/components/public/ItineraryTimeline";
 import { notFound } from "next/navigation";
@@ -375,6 +376,8 @@ export default async function PackageDetailPage({ params, searchParams }: Packag
               </PackageBookingButton>
             </div>
           </div>
+
+          <PackagePriceChart cards={pkg.priceCards} />
 
           {/* Quick Features Bar */}
           <div className="bg-white rounded-[16px] border border-[#E5EAF2] p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center shadow-xs">
