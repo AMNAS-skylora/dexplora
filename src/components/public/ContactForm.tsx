@@ -16,6 +16,8 @@ export function ContactForm() {
     setError(null);
 
     const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    try {
     const result = await createContactEnquiry({
       name: formData.get("name") as string,
       phone: formData.get("phone") as string,
@@ -24,12 +26,16 @@ export function ContactForm() {
       message: formData.get("message") as string,
     });
 
-    setLoading(false);
     if (result.error) {
       setError(result.error);
     } else {
       setSuccess(true);
-      (e.target as HTMLFormElement).reset();
+      form.reset();
+    }
+    } catch {
+      setError("Unable to send your message. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -50,7 +56,7 @@ export function ContactForm() {
       {error && (
         <div className="bg-red-50 text-[#DC2626] p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 border border-red-200">
           <AlertCircle className="w-4.5 h-4.5 shrink-0" />
-          <span>Unable to send your message. Please try again.</span>
+          <span>{error}</span>
         </div>
       )}
 

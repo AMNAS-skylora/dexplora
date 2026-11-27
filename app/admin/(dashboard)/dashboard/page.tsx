@@ -45,7 +45,7 @@ export default async function AdminDashboardPage() {
     db.tripBatch.count({ where: { startDate: { gte: new Date() } } }),
     db.bookingEnquiry.count(),
     db.bookingEnquiry.count({ where: { status: "NEW" } }),
-    db.contactEnquiry.count(),
+    db.contactEnquiry.count({ where: { deletedAt: null } }),
     db.testimonial.count({ where: { status: "PENDING" } }),
     db.galleryImage.count(),
     db.destination.count(),
@@ -55,6 +55,7 @@ export default async function AdminDashboardPage() {
       include: { package: true },
     }),
     db.contactEnquiry.findMany({
+      where: { deletedAt: null },
       take: 5,
       orderBy: { createdAt: "desc" },
     }),
