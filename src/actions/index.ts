@@ -10,6 +10,7 @@ import { calculateBookingBilling, createInitialBillingRows, getBookingBillingRow
 import { setAdminSessionCookie, clearAdminSessionCookie, getAdminSession } from "@/lib/auth";
 import { generateBookingRef, slugify } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
+import { contactSchema } from "@/lib/validations";
 import bcrypt from "bcryptjs";
 
 export type AdminRole = "SUPER_ADMIN" | "ADMIN" | "EDITOR";
@@ -152,42 +153,68 @@ export async function createContactEnquiry(data: {
   message: string;
 }) {
   try {
+    const parsed = contactSchema.safeParse(data);
+    if (!parsed.success) return { error: "Please enter valid contact details and a message." };
+    const { name, phone, email, subject, message } = parsed.data;
+    if (name.length > 200 || phone.length > 40 || (email?.length || 0) > 254 ||
+        (subject?.length || 0) > 300 || message.length > 10000 ||
+        !/^[+0-9\s().-]+$/.test(phone) || phone.replace(/\D/g, "").length < 10 ||
+        phone.replace(/\D/g, "").length > 15 || name.trim().length < 2 || message.trim().length < 5) {
+      return { error: "Please check the phone number and message length." };
+    }
     const enquiry = await db.contactEnquiry.create({
       data: {
-        name: data.name,
-        phone: data.phone,
-        email: data.email || null,
-        subject: data.subject || null,
-        message: data.message,
-        status: "NEW",
+        name: name.trim(), phone: phone.trim(), email: email?.trim() || null,
+        subject: subject?.trim() || null, message: message.trim(),
+        status: "NEW", deletedAt: null,
       },
     });
+    if (!enquiry?.id) return { error: "Could not save your message. Please try again." };
     revalidatePath("/admin/enquiries");
-    return { success: true, enquiry };
-  } catch (error) {
+    revalidatePath("/admin/dashboard");
+    return { success: true };
+  } catch {
     return { error: "Failed to submit message. Please try again." };
   }
 }
 
-export async function updateContactStatus(id: string, status: ContactStatus) {
+async function changeContact(id: string, operation: "status" | "trash" | "restore", status?: ContactStatus) {
   const session = await getAdminSession();
-  if (!session) return { error: "Unauthorized" };
+  if (!session || !["SUPER_ADMIN", "ADMIN", "EDITOR"].includes(session.role)) return { error: "Unauthorized" };
+  if (typeof id !== "string" || !id || id.length > 128) return { error: "Invalid enquiry." };
+  const statuses: ContactStatus[] = ["NEW", "READ", "REPLIED", "RESOLVED", "SPAM"];
+  if (operation === "status" && (!status || !statuses.includes(status))) return { error: "Invalid status." };
 
-  await db.contactEnquiry.update({
-    where: { id },
-    data: { status },
-  });
-  revalidatePath("/admin/enquiries");
-  return { success: true };
+  try {
+    const deletedFilter = operation === "restore"
+      ? { deletedAt: { not: null } }
+      : { deletedAt: null };
+    const data = operation === "trash"
+      ? { deletedAt: new Date(), deletedBy: session.userId }
+      : operation === "restore"
+        ? { deletedAt: null, deletedBy: null }
+        : { status };
+    const updated = await db.contactEnquiry.update({ where: { id, ...deletedFilter }, data });
+    if (!updated) return { error: "Enquiry not found or already changed. Refresh and try again." };
+    revalidatePath("/admin/enquiries");
+    revalidatePath("/admin/enquiries/" + id);
+    revalidatePath("/admin/dashboard");
+    return { success: true };
+  } catch {
+    return { error: "Unable to update the enquiry. Please try again." };
+  }
+}
+
+export async function updateContactStatus(id: string, status: ContactStatus) {
+  return changeContact(id, "status", status);
 }
 
 export async function deleteContact(id: string) {
-  const session = await getAdminSession();
-  if (!session) return { error: "Unauthorized" };
+  return changeContact(id, "trash");
+}
 
-  await db.contactEnquiry.delete({ where: { id } });
-  revalidatePath("/admin/enquiries");
-  return { success: true };
+export async function restoreContact(id: string) {
+  return changeContact(id, "restore");
 }
 
 // ================= REVIEW / TESTIMONIAL ACTIONS =================
